@@ -235,3 +235,25 @@ body {
 .prose-gitplus table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 1rem; }
 .prose-gitplus th { border: 1px solid var(--color-border); padding: 0.5rem 0.75rem; text-align: left; background: #F5F5F4; font-weight: 600; font-size: 0.75rem; }
 .prose-gitplus td { border: 1px solid var(--color-border); padding: 0.5rem 0.75rem; }
+
+/* ── Compact Mode ────────────────────────────────── */
+[data-compact] .card { padding: 0.75rem; }
+[data-compact] .card h2 { font-size: 0.75rem; }
+[data-compact] .bento-card { padding: 1rem; border-radius: 16px; }
+
+/* ── Reduced Motion ──────────────────────────────── */
+[data-reduced-motion] *,
+[data-reduced-motion] *::before,
+[data-reduced-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

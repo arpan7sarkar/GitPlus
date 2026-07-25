@@ -8,12 +8,13 @@ import { Code2, Menu, X, ArrowRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { label: "Products", href: "/features", hasDropdown: true },
-  { label: "Templates", href: "/how-it-works", hasDropdown: true },
-  { label: "Integrations", href: "/cli", hasDropdown: true },
-  { label: "Resources", href: "/docs", hasDropdown: true },
-  { label: "Pricing", href: "/changelog", hasDropdown: false },
+  { label: "Features", href: "/features", hasDropdown: false },
+  { label: "Docs", href: "/docs", hasDropdown: false },
+  { label: "FAQ", href: "/faq", hasDropdown: false },
+  { label: "Privacy", href: "/privacy", hasDropdown: false },
+  { label: "Terms", href: "/terms", hasDropdown: false },
 ];
+
 
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
