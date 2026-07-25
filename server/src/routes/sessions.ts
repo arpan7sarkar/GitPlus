@@ -42,7 +42,7 @@ router.post("/", async (req: Request, res: Response) => {
 // GET /api/sessions/:id
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     if (!id) {
       return res.status(400).json({ error: "session id required" });
     }
@@ -55,7 +55,6 @@ router.get("/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Session not found" });
     }
 
-    // Format fields to match both snake_case and camelCase expected by client
     return res.json({
       id: session.id,
       repoId: session.repoId,
@@ -83,7 +82,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 // PUT /api/sessions/:id
 router.put("/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const { messages } = req.body;
 
     if (!id || !Array.isArray(messages)) {
