@@ -1,13 +1,61 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ─── Chat Sessions ─────────────────────────────────────────────────────────────
+// Persists chat history per repo. Used by SharedChat (/shared/:sessionId).
+model ChatSession {
+  id          String   @id @default(uuid())
+  repoId      String   @map("repo_id")
+  userId      String?  @map("user_id")
+  repoMeta    Json     @default("{}") @map("repo_meta")
+  messages    Json     @default("[]")
+  repoContext String   @default("") @map("repo_context")
+  isPublic    Boolean  @default(true) @map("is_public")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([repoId])
+  @@index([userId])
+  @@map("chat_sessions")
+}
+
+// ─── Visitor Analytics ─────────────────────────────────────────────────────────
+// Powers the live visitor counter on the Landing page.
+model Visit {
+  id        String   @id @default(uuid())
+  visitorId String   @map("visitor_id")
+  ip        String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([visitorId])
+  @@index([createdAt])
+  @@map("visits")
+}
+
+// ─── Code Chunks (Vector Search Metadata Mirror) ────────────────────────────────
+// Mirrors the metadata of chunks stored in Actian VectorAI.
+// Used for keyword search (BM25-style) and for hybrid RRF fusion.
+model CodeChunk {
+  id          String   @id
+  repoId      String   @map("repo_id")
+  filePath    String   @map("file_path")
+  codeSnippet String   @map("code_snippet")
+  startLine   Int      @map("start_line")
+  endLine     Int      @map("end_line")
+  language    String
+  symbolType  String   @map("symbol_type")
+  category    String
+  contentHash String   @default("") @map("content_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([repoId])
+  @@index([category])
+  @@index([filePath])
+  @@map("code_chunks")
 }
