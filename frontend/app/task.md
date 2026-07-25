@@ -1,0 +1,48 @@
+# Project Master Task List: GitPlus Next.js 14+ Reconstruction
+
+- [x] **Phase 0: Scaffold & Setup** <!-- id: 0 -->
+  - [x] Create Next.js 14+ App Router project structure inside `frontend/` <!-- id: 1 -->
+  - [x] Install base dependencies (Next, React, Tailwind v4, Lucide, Framer Motion, Zustand, TanStack Query) <!-- id: 2 -->
+  - [x] Setup Tailwind v4 `@theme` tokens in `app/globals.css` <!-- id: 3 -->
+  - [x] Setup Geist font variables in `app/layout.tsx` <!-- id: 4 -->
+- [x] **Phase 1: Architecture & API Contract** <!-- id: 5 -->
+  - [x] Create `lib/api.ts` central API layer with real/mock routing <!-- id: 6 -->
+  - [x] Build mock data index & fixtures in `lib/mock-data/` <!-- id: 7 -->
+  - [x] Setup Zustand stores (`repo-store.ts`, `settings-store.ts`, `auth-store.ts`, `health-store.ts`) <!-- id: 8 -->
+- [x] **Phase 2: Shared UI Components & Design System** <!-- id: 9 -->
+  - [x] `PageTransition` wrapper (`components/shared/page-transition.tsx`) <!-- id: 10 -->
+  - [x] `SkeletonCard` & loading skeletons (`components/shared/skeleton-card.tsx`) <!-- id: 11 -->
+  - [x] `AnimatedCounter` (`components/shared/animated-counter.tsx`) <!-- id: 12 -->
+  - [x] `SeverityBadge` (`components/shared/severity-badge.tsx`) <!-- id: 13 -->
+  - [x] `BrowserChromeFrame` (`components/shared/browser-chrome-frame.tsx`) <!-- id: 14 -->
+  - [x] `KeepAliveStatus` widget (`components/shared/keep-alive-status.tsx`) <!-- id: 15 -->
+- [x] **Phase 3: Marketing & Landing Site** <!-- id: 16 -->
+  - [x] `SiteHeader` with interactive mobile menu (`components/marketing/site-header.tsx`) <!-- id: 17 -->
+  - [x] `SiteFooter` (`components/marketing/site-footer.tsx`) <!-- id: 18 -->
+  - [x] Landing Page (`app/(marketing)/page.tsx`) with Hero, Interactive Preview, Logos, Features, Benefits, Testimonials, CTA <!-- id: 19 -->
+- [x] **Phase 4: App Shell & Navigation** <!-- id: 20 -->
+  - [x] `AppShell` with pill tabs navigation & layoutId animations (`components/app/app-shell.tsx`) <!-- id: 21 -->
+  - [x] Indexing Progress Page (`app/(app)/index/[repoId]/page.tsx`) with 4-stage stepper & terminal logs <!-- id: 22 -->
+- [x] **Phase 5: Repository Dashboard & Core Features** <!-- id: 23 -->
+  - [x] `RepoDashboard` (`app/(app)/repo/[repoId]/page.tsx`) with stats, overview, key files, quick actions <!-- id: 24 -->
+  - [x] `FileExplorer` (`components/app/file-explorer.tsx`) <!-- id: 25 -->
+  - [x] `FileViewer` (`components/app/file-viewer.tsx`) <!-- id: 26 -->
+- [x] **Phase 6: AI Chat & Intelligent Analysis** <!-- id: 27 -->
+  - [x] `ChatMessage` (`components/app/chat-message.tsx`) <!-- id: 28 -->
+  - [x] `CitationChip` (`components/app/citation-chip.tsx`) <!-- id: 29 -->
+  - [x] `ChatPage` (`app/(app)/repo/[repoId]/chat/page.tsx`) with SSE streaming & split file viewer <!-- id: 30 -->
+- [x] **Phase 7: Security Audit, Architecture & Onboarding** <!-- id: 31 -->
+  - [x] `SecurityPage` (`app/(app)/repo/[repoId]/security/page.tsx`) with 12 check audit & severities <!-- id: 32 -->
+  - [x] `SystemDesignPage` (`app/(app)/repo/[repoId]/system-design/page.tsx`) with diagrams & markdown export <!-- id: 33 -->
+  - [x] `OnboardingPage` (`app/(app)/repo/[repoId]/onboarding/page.tsx`) with setup guide & copy/download <!-- id: 34 -->
+- [x] **Phase 8: Repository Management & Auxiliary Pages** <!-- id: 35 -->
+  - [x] `IssuesPage` (`app/(app)/repo/[repoId]/issues/page.tsx`) with filters & AI solver panel <!-- id: 36 -->
+  - [x] `PRsPage` (`app/(app)/repo/[repoId]/prs/page.tsx`) with diff review panel <!-- id: 37 -->
+  - [x] `CommitsPage` (`app/(app)/repo/[repoId]/commits/page.tsx`) with commit timeline & AI explain <!-- id: 38 -->
+  - [x] `LoginPage` (`app/(app)/login/page.tsx`) <!-- id: 39 -->
+  - [x] `ProfilePage` (`app/(app)/profile/page.tsx`) <!-- id: 40 -->
+  - [x] `SettingsPage` (`app/(app)/settings/page.tsx`) <!-- id: 41 -->
+  - [x] `NotFound` (`app/not-found.tsx`) <!-- id: 42 -->
+- [x] **Phase 9: Production Verification & Build Validation** <!-- id: 43 -->
+  - [x] Clean Next.js 14 production build (`npx next build` -> 14 routes dynamically/statically generated) <!-- id: 44 -->
+  - [x] Local dev server running (`npm run dev`) <!-- id: 45 -->
