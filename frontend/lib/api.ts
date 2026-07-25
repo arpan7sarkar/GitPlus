@@ -670,6 +670,63 @@ export async function fetchStats(): Promise<{ count: number }> {
   return { count: 4200 };
 }
 
+// ─── Semantic Search ──────────────────────────────────────────────────────────
+
+export interface SearchResult {
+  id: string;
+  filePath: string;
+  content: string;
+  startLine: number;
+  endLine: number;
+  score: number;
+  language?: string;
+  chunkType?: string;
+}
+
+export async function ingestCodebase(
+  repoId: string,
+  files: Record<string, string>
+): Promise<{ ingested: number }> {
+  if (!isLive()) return { ingested: 0 };
+  try {
+    const chunks = Object.entries(files).map(([path, content]) => ({
+      filePath: path,
+      content,
+    }));
+    const res = await fetch(`${API_BASE}/search/ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoId, chunks }),
+    });
+    if (res.ok) return res.json();
+  } catch {
+    /* non-fatal */
+  }
+  return { ingested: 0 };
+}
+
+export async function hybridSearch(
+  query: string,
+  repoId: string,
+  filter?: { language?: string; chunkType?: string }
+): Promise<SearchResult[]> {
+  if (!isLive()) return [];
+  try {
+    const res = await fetch(`${API_BASE}/search/hybrid`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, repoId, filter, limit: 20 }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data.results) ? data.results : [];
+    }
+  } catch {
+    /* non-fatal */
+  }
+  return [];
+}
+
 // ─── login ───────────────────────────────────────────────────────────────────
 
 export async function login(): Promise<{ success: boolean }> {
