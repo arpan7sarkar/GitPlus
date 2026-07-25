@@ -13,6 +13,11 @@ import {
 import { GithubIcon, TwitterIcon } from "@/components/shared/icons";
 import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { cn } from "@/lib/utils";
+import { useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useUsageStore } from "@/lib/stores/usage-store";
+import { LoginWall } from "@/components/app/login-wall";
+import { trackVisit, fetchStats } from "@/lib/api";
 
 // Example Repositories for Quick Click
 const QUICK_REPOS = [
@@ -101,21 +106,50 @@ const TESTIMONIALS = [
 
 export default function LandingPage() {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useUser();
+  const { canIndex } = useUsageStore();
   const [repoUrl, setRepoUrl] = useState("");
   const [activeShowcaseTab, setActiveShowcaseTab] = useState("overview");
   const [activeAccordion, setActiveAccordion] = useState("diagrams");
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [showLoginWall, setShowLoginWall] = useState(false);
+  const [pat, setPat] = useState("");
+  const [showPat, setShowPat] = useState(false);
+  const [visitorCount, setVisitorCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let visitorId = localStorage.getItem("gitplus_visitor");
+    if (!visitorId) {
+      visitorId = `v_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+      localStorage.setItem("gitplus_visitor", visitorId);
+    }
+    trackVisit(visitorId);
+    fetchStats().then(s => setVisitorCount(s.count));
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoaded && !canIndex(!!isSignedIn)) {
+      setShowLoginWall(true);
+      return;
+    }
     const url = repoUrl.trim();
     if (!url) return;
+    
+    if (pat) {
+      localStorage.setItem("github_pat", pat);
+    }
+    
     const parts = url.replace("https://github.com/", "").split("/");
     const id = `gh-${parts[0]}-${parts[1]}-${Date.now()}`;
     router.push(`/index/${encodeURIComponent(id)}?url=${encodeURIComponent(url)}`);
   };
 
   const handleQuickClick = (url: string) => {
+    if (isLoaded && !canIndex(!!isSignedIn)) {
+      setShowLoginWall(true);
+      return;
+    }
     setRepoUrl(url);
     const parts = url.replace("https://github.com/", "").split("/");
     const id = `gh-${parts[0]}-${parts[1]}-${Date.now()}`;
@@ -220,6 +254,42 @@ export default function LandingPage() {
                 <ArrowRight className="h-3.5 w-3.5" />
               </motion.button>
             </motion.div>
+            
+            {/* Private Repo PAT Toggle */}
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowPat(!showPat)}
+                className="text-[11px] text-[#64748B] hover:text-[#0F172A] flex items-center gap-1 transition-colors"
+              >
+                <Lock className="h-3 w-3" />
+                {showPat ? "Hide private repo token" : "Indexing a private repo?"}
+              </button>
+            </div>
+            
+            <AnimatePresence>
+              {showPat && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden mt-3"
+                >
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-[#E2E8F0] shadow-sm">
+                    <input
+                      type="password"
+                      value={pat}
+                      onChange={(e) => setPat(e.target.value)}
+                      placeholder="GitHub Personal Access Token (PAT)"
+                      className="flex-1 py-1 text-xs placeholder:text-[#94A3B8] text-[#0F172A] border-none focus:outline-none bg-transparent font-mono"
+                    />
+                  </div>
+                  <p className="text-[10px] text-[#94A3B8] text-center mt-2">
+                    Token is only stored in your browser's localStorage.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.form>
 
           {/* Quick Repos Chips — with branch icon */}
@@ -863,6 +933,20 @@ export default function LandingPage() {
           <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-[#0284C7]/20 rounded-full blur-3xl pointer-events-none" />
         </div>
       </section>
+      
+      {/* ── 9. Visitor Counter ─────────────────────────────────────────────────── */}
+      <div className="flex flex-col items-center justify-center py-10 bg-[#FAF9F6] border-t border-[#E2E8F0] space-y-2 text-[#475569] font-mono text-xs">
+        <div className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-[#0284C7]" />
+          <span>Codebases analyzed by developers:</span>
+          {visitorCount !== null ? (
+            <AnimatedCounter value={visitorCount} className="font-bold text-[#0F172A] bg-white border border-[#E2E8F0] px-2 py-0.5 rounded shadow-sm" />
+          ) : (
+            <span className="font-bold text-[#0F172A] bg-white border border-[#E2E8F0] px-2 py-0.5 rounded shadow-sm opacity-50">...</span>
+          )}
+        </div>
+      </div>
+      <LoginWall open={showLoginWall} onClose={() => setShowLoginWall(false)} />
     </div>
   );
 }

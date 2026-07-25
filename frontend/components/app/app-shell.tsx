@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import { Code2, Search, LogOut, User, Settings, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/lib/stores/repo-store";
-import { useAuthStore } from "@/lib/stores/auth-store";
+import { useUser, UserButton, SignInButton } from "@clerk/nextjs";
+import { useSettingsStore } from "@/lib/stores/settings-store";
 
 const TABS = [
   { label: "Overview",       segment: "" },
@@ -28,7 +29,8 @@ export function AppShell({ children }: AppShellProps) {
   const params = useParams();
   const repoId = params?.repoId as string | undefined;
   const { meta } = useRepoStore();
-  const { user, logout } = useAuthStore();
+  const { user, isLoaded } = useUser();
+  const { settings } = useSettingsStore();
 
   const isRepoPage = pathname.startsWith("/repo/");
 
@@ -42,7 +44,11 @@ export function AppShell({ children }: AppShellProps) {
   const activeSegment = getActiveSegment();
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] flex flex-col">
+    <div
+      className="min-h-screen bg-[#FAFAFA] flex flex-col"
+      data-compact={settings.compactMode || undefined}
+      data-reduced-motion={settings.reducedMotion || undefined}
+    >
       {/* Top nav */}
       <header className="sticky top-0 z-50 border-b border-[#E5E5E3] bg-white/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between h-14 px-6">
@@ -70,19 +76,19 @@ export function AppShell({ children }: AppShellProps) {
               <Search className="h-4 w-4" />
             </button>
 
-            {user && (
-              <div className="flex items-center gap-2 ml-2">
-                <Link href="/settings" className="p-2 rounded-lg text-[#5B5F66] hover:bg-[#F5F5F4] hover:text-[#111114] transition-colors">
-                  <Settings className="h-4 w-4" />
-                </Link>
-                <Link href="/profile" className="p-2 rounded-lg text-[#5B5F66] hover:bg-[#F5F5F4] hover:text-[#111114] transition-colors">
-                  <User className="h-4 w-4" />
-                </Link>
-                <button onClick={logout} className="p-2 rounded-lg text-[#5B5F66] hover:bg-[#F5F5F4] hover:text-[#111114] transition-colors">
-                  <LogOut className="h-4 w-4" />
-                </button>
+            {isLoaded && user ? (
+              <div className="flex items-center gap-3 ml-2">
+                <UserButton afterSignOutUrl="/" />
               </div>
-            )}
+            ) : isLoaded ? (
+              <div className="flex items-center gap-2 ml-2">
+                <SignInButton mode="modal">
+                  <button className="px-4 py-1.5 rounded-lg bg-[#111114] text-white text-xs font-semibold hover:bg-[#1E1E22] transition-colors shadow-sm">
+                    Sign In
+                  </button>
+                </SignInButton>
+              </div>
+            ) : null}
           </div>
         </div>
 
