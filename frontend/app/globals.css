@@ -1,0 +1,237 @@
+@import "tailwindcss";
+
+/* ── Design Tokens ─────────────────────────────────── */
+:root {
+  /* Colors */
+  --color-background: #FAFAFA;
+  --color-surface: #FFFFFF;
+  --color-ink: #111114;
+  --color-ink-muted: #5B5F66;
+  --color-border: #E5E5E3;
+  --color-dark: #0D0D10;
+
+  /* Accent — indigo scale */
+  --color-accent: #4338CA;
+  --color-accent-light: #6366F1;
+  --color-accent-bg: #EEF2FF;
+
+  /* Amber */
+  --color-amber: #F59E0B;
+
+  /* Severity */
+  --color-critical: #DC2626;
+  --color-high: #F97316;
+  --color-medium: #EAB308;
+  --color-low: #64748B;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.10);
+}
+
+@theme inline {
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-border: var(--color-border);
+  --color-dark: var(--color-dark);
+  --color-accent: var(--color-accent);
+  --color-accent-light: var(--color-accent-light);
+  --color-accent-bg: var(--color-accent-bg);
+  --color-amber: var(--color-amber);
+  --color-critical: var(--color-critical);
+  --color-high: var(--color-high);
+  --color-medium: var(--color-medium);
+  --color-low: var(--color-low);
+
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-display: var(--font-display), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-lg: var(--shadow-lg);
+}
+
+/* ── Base ─────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+/* ── Custom Scrollbar ────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #C5C5C3; }
+
+/* ── Animations ──────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes gradient-drift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Utility Classes ─────────────────────────────── */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #F0F0EE 0%,
+    #E5E5E3 40%,
+    #F0F0EE 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-hero {
+  background: url('/hero-bg.png') center bottom / cover no-repeat;
+  position: relative;
+}
+
+.sky-gradient-text {
+  background: linear-gradient(135deg, #0284C7 0%, #2563EB 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.fillout-hero-bg {
+  background: url('/hero-bg.png') center bottom / cover no-repeat;
+  position: relative;
+  overflow: hidden;
+}
+
+.fillout-hero-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(135, 206, 250, 0.3) 0%, transparent 40%);
+  pointer-events: none;
+}
+
+.fillout-hero-bg::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 120px;
+  background: linear-gradient(to top, #FAF9F6 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.bento-card {
+  background: var(--color-surface);
+  border: 1px solid rgba(229, 229, 227, 0.8);
+  border-radius: 24px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bento-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08), 0 8px 20px -4px rgba(0, 0, 0, 0.04);
+}
+
+.pill-badge {
+  display: inline-flex;
+  items-center: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: #F3F4F6;
+  color: #374151;
+  border: 1px solid #E5E7EB;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.dark-band {
+  background: var(--color-dark);
+  color: #FFFFFF;
+}
+
+/* ── Prose for markdown content ──────────────────── */
+.prose-gitplus h1 { font-size: 1.5rem; font-weight: 700; color: var(--color-ink); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-border); }
+.prose-gitplus h2 { font-size: 1.1rem; font-weight: 600; color: var(--color-ink); margin-top: 1.5rem; margin-bottom: 0.5rem; }
+.prose-gitplus h3 { font-size: 0.9rem; font-weight: 600; color: var(--color-ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1rem; margin-bottom: 0.25rem; }
+.prose-gitplus p { font-size: 0.875rem; color: #374151; line-height: 1.7; margin-bottom: 0.75rem; }
+.prose-gitplus ul { font-size: 0.875rem; color: #374151; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+.prose-gitplus li { margin-bottom: 0.25rem; }
+.prose-gitplus code { font-family: var(--font-mono); font-size: 0.8rem; background: var(--color-accent-bg); color: var(--color-accent); padding: 0.1rem 0.3rem; border-radius: 4px; }
+.prose-gitplus pre { background: #1E1E2E; border-radius: var(--radius-md); padding: 1rem; overflow-x: auto; margin-bottom: 1rem; }
+.prose-gitplus pre code { background: transparent; color: #CDD6F4; padding: 0; }
+.prose-gitplus strong { color: var(--color-ink); font-weight: 600; }
+.prose-gitplus table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 1rem; }
+.prose-gitplus th { border: 1px solid var(--color-border); padding: 0.5rem 0.75rem; text-align: left; background: #F5F5F4; font-weight: 600; font-size: 0.75rem; }
+.prose-gitplus td { border: 1px solid var(--color-border); padding: 0.5rem 0.75rem; }
