@@ -8,6 +8,7 @@ import { Stepper } from "@/components/app/stepper";
 import { PageTransition } from "@/components/shared/page-transition";
 import { indexRepository } from "@/lib/api";
 import { useRepoStore } from "@/lib/stores/repo-store";
+import { useUsageStore } from "@/lib/stores/usage-store";
 
 const STAGES = [
   "Validating Repository URL",
@@ -24,6 +25,7 @@ export default function IndexingPage() {
   const repoUrl = searchParams?.get("url") ?? "";
 
   const { setRepoData, setIndexing, addTerminalLog } = useRepoStore();
+  const { incrementIndex } = useUsageStore();
 
   const [currentStage, setCurrentStage] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
@@ -43,10 +45,12 @@ export default function IndexingPage() {
     setIndexing(true, 0, "Starting...");
     addLog(`Indexing ${repoUrl || "demo repository"}...`);
 
+    const pat = token || localStorage.getItem("github_pat") || undefined;
+
     try {
       const result = await indexRepository(
         repoUrl || "https://github.com/vercel/next.js",
-        token,
+        pat,
         (stage, message) => {
           setCurrentStage(stage);
           setIndexing(true, stage, message);
@@ -56,18 +60,24 @@ export default function IndexingPage() {
 
       addLog("✓ Indexing complete!");
       setIndexing(false);
+      incrementIndex();
 
-      setRepoData({
+      const repoDataObj = {
         repoId: result.repoId,
         meta: result.meta,
         fileTree: result.fileTree,
         fileContents: result.fileContents,
         repoContext: result.repoContext,
-        githubToken: token,
+        githubToken: pat,
         indexMode: result.indexMode,
         totalSourceFiles: result.totalSourceFiles,
         unfetchedFiles: result.unfetchedFiles,
-      });
+      };
+
+      setRepoData(repoDataObj);
+      
+      // Cache for hydration
+      localStorage.setItem(`repo_${result.repoId}`, JSON.stringify(repoDataObj));
 
       // Navigate to dashboard
       setTimeout(() => {

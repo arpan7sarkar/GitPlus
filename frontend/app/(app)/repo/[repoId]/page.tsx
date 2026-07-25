@@ -12,6 +12,7 @@ import { AnimatedCounter } from "@/components/shared/animated-counter";
 import { useRepoStore } from "@/lib/stores/repo-store";
 import { generateOverview } from "@/lib/api";
 import { MOCK_GRAPH_NODES, MOCK_GRAPH_LINKS } from "@/lib/mock-data/graph";
+import { CodebaseSearch } from "@/components/app/codebase-search";
 
 const stagger = {
   parent: { animate: { transition: { staggerChildren: 0.06 } } },
@@ -22,9 +23,25 @@ export default function RepoDashboard() {
   const params = useParams();
   const router = useRouter();
   const repoId = params?.repoId as string;
-  const { meta, overview, setOverview, repoContext, indexMode, totalSourceFiles } = useRepoStore();
+  const { meta, overview, setOverview, repoContext, indexMode, totalSourceFiles, setRepoData } = useRepoStore();
 
   const [loadingOverview, setLoadingOverview] = useState(false);
+
+  useEffect(() => {
+    if (!meta && repoId) {
+      const cached = localStorage.getItem(`repo_${repoId}`);
+      if (cached) {
+        try {
+          const result = JSON.parse(cached);
+          setRepoData(result);
+        } catch {
+          router.push("/");
+        }
+      } else {
+        router.push("/");
+      }
+    }
+  }, [meta, repoId, router, setRepoData]);
 
   useEffect(() => {
     if (!overview && repoContext) {
@@ -65,6 +82,10 @@ export default function RepoDashboard() {
             </span>
           </motion.div>
         )}
+        {/* Codebase search */}
+        <div className="mb-6">
+          <CodebaseSearch repoId={repoId} />
+        </div>
 
         {/* Stats strip */}
         <motion.div
