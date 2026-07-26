@@ -1,8 +1,10 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 
+import authRouter from "./routes/auth.js";
 import chatRouter from "./routes/chat.js";
 import repoRouter from "./routes/repo.js";
 import issuesRouter from "./routes/issues.js";
@@ -17,7 +19,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors({ origin: "*" }));
+// credentials:true + an explicit origin (not "*") is required for the GitHub OAuth
+// session cookie to be sent/received cross-origin in production; in dev, Vite's
+// proxy makes requests same-origin so this mainly matters for deployed builds.
+app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:8080", credentials: true }));
+app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 
 // Rate limiting: 200 requests per 15 minutes window for /api/ routes
@@ -32,6 +38,7 @@ const limiter = rateLimit({
 app.use("/api/", limiter);
 
 // API Route Mounts
+app.use("/api/auth", authRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/repo", repoRouter);
 app.use("/api/repo", issuesRouter);

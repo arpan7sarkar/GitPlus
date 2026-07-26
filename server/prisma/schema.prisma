@@ -6,6 +6,41 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Users (GitHub OAuth) ───────────────────────────────────────────────────────
+// One row per GitHub account that has ever signed in. `accessToken` is the user's
+// GitHub OAuth token, AES-256-GCM encrypted at rest (see server/src/lib/crypto.ts) —
+// using it raises GitHub API rate limits from 60/hr (unauthenticated) to 5000/hr,
+// and unlocks access to the user's private repos.
+model User {
+  id          String   @id @default(uuid())
+  githubId    String   @unique @map("github_id")
+  username    String
+  name        String?
+  email       String?
+  avatarUrl   String?  @map("avatar_url")
+  accessToken String   @map("access_token")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  sessions Session[]
+
+  @@map("users")
+}
+
+// ─── Sessions ────────────────────────────────────────────────────────────────
+// Server-side session store backing the httpOnly `gitplus_session` cookie.
+// Token itself is the opaque, high-entropy primary key (no separate id needed).
+model Session {
+  token     String   @id
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
 // ─── Chat Sessions ─────────────────────────────────────────────────────────────
 // Persists chat history per repo. Used by SharedChat (/shared/:sessionId).
 model ChatSession {

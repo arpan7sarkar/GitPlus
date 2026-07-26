@@ -57,6 +57,7 @@ async function apiRequest<T>(
   const url = path.startsWith("http") ? path : `${BASE}${path}`;
   const res = await fetch(url, {
     ...options,
+    credentials: "include", // sends the gitplus_session cookie set by GitHub OAuth login
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
@@ -87,6 +88,7 @@ export async function indexRepository(
 
   const res = await fetch(`${BASE}/repo/index`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ githubUrl, githubToken }),
   });
@@ -209,6 +211,7 @@ export async function streamChat(params: {
 }) {
   const res = await fetch(`${BASE}/chat`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       messages: params.messages,
@@ -347,7 +350,7 @@ export async function fetchPullRequestDiff(
   if (githubToken) params.set("githubToken", githubToken);
 
   const url = `${BASE}/repo/pulls/${prNumber}/diff?${params.toString()}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { credentials: "include" });
 
   if (!res.ok) {
     throw new Error(`Failed to fetch PR diff: HTTP ${res.status}`);
@@ -502,18 +505,52 @@ export async function checkHealth(): Promise<HealthResponse> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Auth (placeholder — no-op until Clerk is wired)
+// Auth — GitHub OAuth (server-side session, cookie-based)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Authenticates user and fetches profile/roles safely.
- * Currently a no-op passthrough since auth is handled separately.
- */
-export async function authenticateAndFetchUserData(userData?: any) {
-  if (!userData?.profile?.roles?.[0]?.name) {
-    return { authenticated: false, role: "guest", profile: null };
-  }
+export interface AuthUser {
+  id: string;
+  email: string | null;
+  created_at: string;
+  user_metadata: {
+    avatar_url: string | null;
+    user_name: string;
+    full_name: string | null;
+  };
+}
 
-  const primaryRole = userData.profile.roles[0].name.toLowerCase();
-  return { authenticated: true, role: primaryRole, profile: userData.profile };
+export interface AuthSession {
+  provider_token: string;
+}
+
+/**
+ * Full-page redirect to kick off the GitHub OAuth flow.
+ * Not a fetch — GitHub's consent screen must be a top-level navigation.
+ */
+export function githubLoginUrl(): string {
+  return `${BASE}/auth/github`;
+}
+
+/**
+ * GET /api/auth/me — Returns the current session's user + GitHub provider token, or null if signed out.
+ */
+export async function fetchCurrentUser(): Promise<{ user: AuthUser; session: AuthSession } | null> {
+  const res = await fetch(`${BASE}/auth/me`, { credentials: "include" });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`Failed to fetch current user: HTTP ${res.status}`);
+  return res.json();
+}
+
+/**
+ * GET /api/auth/repos — Lists the signed-in user's GitHub repositories.
+ */
+export async function fetchUserRepositories(): Promise<any[]> {
+  return apiRequest<any[]>("/auth/repos");
+}
+
+/**
+ * POST /api/auth/logout — Destroys the server-side session and clears the cookie.
+ */
+export async function logoutUser(): Promise<void> {
+  await apiRequest<{ success: boolean }>("/auth/logout", { method: "POST" });
 }

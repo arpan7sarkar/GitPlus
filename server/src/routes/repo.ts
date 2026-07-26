@@ -9,6 +9,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import { resolveGithubToken } from "../lib/githubAuth.js";
 
 const router = Router();
 
@@ -153,8 +154,9 @@ router.post("/index", async (req: Request, res: Response) => {
       Accept: "application/vnd.github.v3+json",
       "User-Agent": "GitPlus-AI",
     };
-    if (githubToken) {
-      headers.Authorization = `Bearer ${githubToken}`;
+    const resolvedToken = await resolveGithubToken(req, githubToken);
+    if (resolvedToken) {
+      headers.Authorization = `Bearer ${resolvedToken}`;
     }
 
     // Step 1: Get repo info
@@ -306,7 +308,8 @@ router.post("/file", async (req: Request, res: Response) => {
     }
 
     const headers: Record<string, string> = { Accept: "application/vnd.github.v3+json" };
-    if (githubToken) headers.Authorization = `Bearer ${githubToken}`;
+    const resolvedToken = await resolveGithubToken(req, githubToken);
+    if (resolvedToken) headers.Authorization = `Bearer ${resolvedToken}`;
 
     const fileRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, { headers });
     if (!fileRes.ok) {
@@ -344,7 +347,8 @@ router.post("/fetch-batch", async (req: Request, res: Response) => {
     }
 
     const headers: Record<string, string> = { Accept: "application/vnd.github.v3+json" };
-    if (githubToken) headers.Authorization = `Bearer ${githubToken}`;
+    const resolvedToken = await resolveGithubToken(req, githubToken);
+    if (resolvedToken) headers.Authorization = `Bearer ${resolvedToken}`;
 
     const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const CONCURRENCY = 3;

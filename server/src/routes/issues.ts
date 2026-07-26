@@ -10,6 +10,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import { resolveGithubToken } from "../lib/githubAuth.js";
 
 const router = Router();
 
@@ -25,8 +26,9 @@ router.post("/issues", async (req: Request, res: Response) => {
       Accept: "application/vnd.github.v3+json",
       "User-Agent": "GitPlus-AI",
     };
-    if (githubToken) {
-      headers.Authorization = `Bearer ${githubToken}`;
+    const resolvedToken = await resolveGithubToken(req, githubToken);
+    if (resolvedToken) {
+      headers.Authorization = `Bearer ${resolvedToken}`;
     }
 
     const params = new URLSearchParams({
@@ -87,8 +89,9 @@ router.get("/pulls", async (req: Request, res: Response) => {
       Accept: "application/vnd.github.v3+json",
       "User-Agent": "GitPlus-AI",
     };
-    if (githubToken) {
-      headers.Authorization = `Bearer ${githubToken}`;
+    const resolvedToken = await resolveGithubToken(req, githubToken);
+    if (resolvedToken) {
+      headers.Authorization = `Bearer ${resolvedToken}`;
     }
 
     const params = new URLSearchParams({
@@ -143,8 +146,9 @@ router.get("/commits", async (req: Request, res: Response) => {
       Accept: "application/vnd.github.v3+json",
       "User-Agent": "GitPlus-AI",
     };
-    if (githubToken) {
-      headers.Authorization = `Bearer ${githubToken}`;
+    const resolvedToken = await resolveGithubToken(req, githubToken);
+    if (resolvedToken) {
+      headers.Authorization = `Bearer ${resolvedToken}`;
     }
 
     const resp = await fetch(
@@ -193,8 +197,9 @@ router.get("/pulls/:pr/diff", async (req: Request, res: Response) => {
       Accept: "application/vnd.github.v3.diff",
       "User-Agent": "GitPlus-AI",
     };
-    if (githubToken) {
-      headers.Authorization = `Bearer ${githubToken}`;
+    const resolvedToken = await resolveGithubToken(req, githubToken);
+    if (resolvedToken) {
+      headers.Authorization = `Bearer ${resolvedToken}`;
     }
 
     const resp = await fetch(
