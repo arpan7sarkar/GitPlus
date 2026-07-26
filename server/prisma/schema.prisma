@@ -22,7 +22,9 @@ model User {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  sessions Session[]
+  sessions         Session[]
+  indexedRepos     IndexedRepo[]
+  vexReviewConfigs VexReviewConfig[]
 
   @@map("users")
 }
@@ -39,6 +41,83 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+// ─── Indexed Repos ───────────────────────────────────────────────────────────
+// One row per (user, repo) — powers the "My Repos" page. Written on every
+// /api/search/ingest call made by a logged-in user; unrelated to the Node
+// hierarchy itself (which has no userId — it's keyed only by repoId).
+model IndexedRepo {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repoId        String   @map("repo_id")
+  owner         String
+  name          String
+  description   String?
+  language      String?
+  stars         Int?
+  forks         Int?
+  lastIndexedAt DateTime @default(now()) @map("last_indexed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, repoId])
+  @@index([userId])
+  @@map("indexed_repos")
+}
+
+// ─── VexReview (AI PR Reviewer) ──────────────────────────────────────────────
+// "Add the action" = create one of these rows (no files written to the user's
+// repo, no GitHub Actions involved — the review engine runs inside this server,
+// using the user's own stored GitHub token). The "review this PR" button then
+// creates a VexReviewRun and runs server/src/lib/vexreview/ against it directly.
+model VexReviewConfig {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner     String
+  repo      String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  runs VexReviewRun[]
+
+  @@unique([userId, owner, repo])
+  @@index([userId])
+  @@map("vexreview_configs")
+}
+
+enum VexReviewRunStatus {
+  queued
+  running
+  completed
+  failed
+}
+
+// One row per review invocation — the button click. `stage`/`stageMessage` are
+// updated live while `running` so the frontend can poll for progress instead of
+// holding a connection open for what can be a multi-minute LLM-heavy job.
+model VexReviewRun {
+  id             String             @id @default(uuid())
+  configId       String             @map("config_id")
+  config         VexReviewConfig    @relation(fields: [configId], references: [id], onDelete: Cascade)
+  userId         String             @map("user_id")
+  prNumber       Int                @map("pr_number")
+  status         VexReviewRunStatus @default(queued)
+  stage          String?
+  stageMessage   String?            @map("stage_message")
+  resultStatus   String?            @map("result_status") // reviewed | skipped | rejected_sensitive_files
+  filesReviewed  Int?               @map("files_reviewed")
+  reviewComments Int?               @map("review_comments")
+  lgtmCount      Int?               @map("lgtm_count")
+  error          String?
+  startedAt      DateTime           @default(now()) @map("started_at")
+  completedAt    DateTime?          @map("completed_at")
+
+  @@index([configId])
+  @@index([userId, startedAt])
+  @@map("vexreview_runs")
 }
 
 // ─── Chat Sessions ─────────────────────────────────────────────────────────────
