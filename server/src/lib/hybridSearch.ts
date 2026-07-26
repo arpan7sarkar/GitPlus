@@ -41,7 +41,7 @@ export function keywordSearch(query: string, candidates: KeywordCandidate[]): Ke
   return scored
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 15);
+    .slice(0, 14);
 }
 
 /**
