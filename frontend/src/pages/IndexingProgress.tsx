@@ -133,7 +133,11 @@ const IndexingProgress = () => {
 
         // Fire off code chunk ingestion to Actian VectorAI + Prisma (background)
         // This populates the search index for hybrid RAG in AI chat
-        ingestCodeChunks(data.repoId, data.fileContents.map(f => ({ path: f.path, content: f.content })))
+        ingestCodeChunks(
+          data.repoId,
+          data.fileContents.map(f => ({ path: f.path, content: f.content })),
+          { name: data.meta?.name, description: data.meta?.description, language: data.meta?.language }
+        )
           .then(res => console.log(`[ingest] Ingested ${res.count} code chunks for ${data.repoId}`))
           .catch(err => console.warn("[ingest] Code chunk ingestion failed (non-blocking):", err));
 

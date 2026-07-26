@@ -402,11 +402,12 @@ export async function fetchFileBatch(params: {
  */
 export async function ingestCodeChunks(
   repoId: string,
-  files: { path: string; content: string }[]
+  files: { path: string; content: string }[],
+  repoMeta?: { name?: string; description?: string; language?: string }
 ): Promise<IngestResponse> {
   return apiRequest<IngestResponse>("/search/ingest", {
     method: "POST",
-    body: JSON.stringify({ repoId, files }),
+    body: JSON.stringify({ repoId, files, repoMeta }),
   });
 }
 
