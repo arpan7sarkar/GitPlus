@@ -64,7 +64,15 @@ export async function ensureCollection(): Promise<void> {
     } else {
       console.log(`[actian] ✓ Collection "${COLLECTION}" ready`);
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (
+      err?.code === 101 ||
+      err?.name === "CollectionExistsError" ||
+      (err?.message && err.message.includes("already exists"))
+    ) {
+      console.log(`[actian] ✓ Collection "${COLLECTION}" ready`);
+      return;
+    }
     console.error("[actian] ensureCollection error:", err);
   }
 }
