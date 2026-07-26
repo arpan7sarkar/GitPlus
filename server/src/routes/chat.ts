@@ -15,6 +15,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import { retrieveForQuery } from "../lib/retrieval.js";
 
 const router = Router();
 
@@ -192,15 +193,15 @@ Be thorough, technical, and precise. Reference actual files and code patterns fr
   const systemPrompt = `You are CodebaseGPT, an expert software architect and senior developer. Your job is to provide highly structured, in-depth, and deeply technical answers to questions about the ongoing codebase.
 
 RULES for your responses:
-1. USE STRUCTURE: Always use Markdown headers (e.g., ### Overview, ### Architecture) to organize your response cleanly. 
+1. USE STRUCTURE: Always use Markdown headers (e.g., ### Overview, ### Architecture) to organize your response cleanly.
 2. BE IN-DEPTH: Do not give superficial summaries. Dive deep into the code, algorithms, patterns, and data flow.
 3. USE BULLET POINTS: Use bulleted and numbered lists extensively to break down complex logic step-by-step.
 4. SHOW EXAMPLES: Provide precise code snippets from the codebase to back up your points, maintaining original syntax and language hints.
-5. CITE SOURCES: Always cite exact file paths and line numbers naturally (e.g., \`[src/index.ts:15-30]\`) so the developer can follow along.
+5. CITE SOURCES: Always cite exact file paths and line numbers naturally (e.g., \`[src/index.ts:15-30]\`) so the developer can follow along. Every code snippet below is already labeled with its file path and line range — use that exact label.
 6. BE PROFESSIONAL: Provide rigorous technical documentation and architectural reviews. Forget conversational fluff.
-7. ACCURACY IS CRITICAL: Base your analysis strictly on the provided context. If you lack context, clearly state what is missing instead of guessing.
+7. ACCURACY IS CRITICAL: The context below is a small set of semantically retrieved chunks for THIS specific question, not the entire codebase. If something relevant clearly isn't in the provided context, say so explicitly rather than guessing or inventing file paths.
 
-CODEBASE CONTEXT:
+RETRIEVED CONTEXT FOR THIS QUESTION:
 ${ctx}`;
 
   return {
@@ -211,10 +212,30 @@ ${ctx}`;
 
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const { messages = [], repoContext = "", action = "chat" } = req.body;
+    const { messages = [], repoContext = "", action = "chat", repoId } = req.body;
     const isStreaming = action === "chat";
 
-    const { systemPrompt, userMessages } = buildPrompts(action, repoContext, messages);
+    // Real per-turn RAG: for conversational chat with a repoId, retrieve chunks
+    // relevant to THIS question fresh every turn instead of reusing one static
+    // repoContext blob for the whole conversation. Falls back to the frontend-
+    // supplied repoContext if there's no repoId or retrieval comes back empty
+    // (e.g. repo hasn't been ingested into the search index yet).
+    let effectiveContext = repoContext;
+    if (action === "chat" && repoId) {
+      const lastUserMessage = [...messages].reverse().find((m: any) => m.role === "user");
+      if (lastUserMessage?.content) {
+        try {
+          const { chunks, contextText } = await retrieveForQuery(lastUserMessage.content, repoId, { k: 8 });
+          if (chunks.length > 0) {
+            effectiveContext = contextText;
+          }
+        } catch (retrievalErr) {
+          console.warn("[chat] Retrieval failed, falling back to repoContext:", retrievalErr);
+        }
+      }
+    }
+
+    const { systemPrompt, userMessages } = buildPrompts(action, effectiveContext, messages);
 
     const requestBodyMessages = [
       { role: "system", content: systemPrompt },

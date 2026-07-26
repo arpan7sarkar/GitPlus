@@ -112,6 +112,7 @@ const ChatInterface = () => {
       await streamChat({
         messages: chatHist,
         repoContext: contextForAI,
+        repoId,
         onDelta: (chunk) => {
           fullContent += chunk;
           setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: fullContent } : m)));

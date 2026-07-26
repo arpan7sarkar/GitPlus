@@ -4,12 +4,16 @@ services:
     image: actian/vectorai:latest
     container_name: gitplus-vectorai
     ports:
-      - "50051:50051"   # REST API
+      - "6573:6573"     # internal
       - "6574:6574"     # gRPC / SDK port
+      - "6575:6575"     # Web GUI (Console / Collections browser / License Manager) — http://localhost:6575
     volumes:
-      - vectorai_data:/data
+      # The image ignores VECTORAI_DATA_DIR and always writes under
+      # /var/lib/actian-vectorai internally — mounting at /data (as before)
+      # silently persisted nothing, so every container recreate wiped all data.
+      - vectorai_data:/var/lib/actian-vectorai
     environment:
-      - VECTORAI_DATA_DIR=/data
+      - ACTIAN_VECTORAI_ACCEPT_EULA=YES   # see https://docs.vectoraidb.actian.com/home/support/eula
     restart: unless-stopped
 
   postgres:

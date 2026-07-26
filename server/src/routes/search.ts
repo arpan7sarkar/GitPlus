@@ -16,11 +16,11 @@
 import path from "path";
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
-import { upsertChunks, vectorSearch, deleteByRepo, type NodeLevel, type NodePayload } from "../lib/actian.js";
-import { generateEmbedding, generateEmbeddingsBatch } from "../lib/embeddings.js";
+import { upsertChunks, deleteByRepo, type NodeLevel, type NodePayload } from "../lib/actian.js";
+import { generateEmbeddingsBatch } from "../lib/embeddings.js";
 import { chunkCodeFiles, detectCategory, hash, type FileNode, type SymbolChunk } from "../lib/chunker.js";
 import { summarizeFile, summarizeModule, summarizeRepo, mapWithConcurrency } from "../lib/summarize.js";
-import { keywordSearch, reciprocalRankFusion } from "../lib/hybridSearch.js";
+import { retrieveForQuery } from "../lib/retrieval.js";
 
 const router = Router();
 
@@ -257,82 +257,29 @@ router.post("/hybrid", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "query and repoId string parameters are required" });
     }
 
-    // 1. Embed search query
-    const queryVector = await generateEmbedding(query);
-
-    // 2. Dense vector search in Actian VectorAI
-    const actianFilter: Record<string, string> = { repoId };
-    if (filter?.category) actianFilter.category = filter.category;
-    if (filter?.language) actianFilter.language = filter.language;
-    if (filter?.level) actianFilter.level = filter.level;
-
-    const vectorResults = await vectorSearch(queryVector, actianFilter, 10);
-
-    // 3. Sparse keyword search over Neon Postgres node metadata
-    const dbNodes = await prisma.node.findMany({
-      where: {
-        repoId,
-        ...(filter?.category ? { category: filter.category } : {}),
-        ...(filter?.language ? { language: filter.language } : {}),
-        ...(filter?.level ? { level: filter.level } : {}),
-      },
-      select: {
-        id: true,
-        level: true,
-        parentId: true,
-        filePath: true,
-        code: true,
-        summary: true,
-        embeddingText: true,
-        category: true,
-        symbolType: true,
-        language: true,
-        startLine: true,
-        endLine: true,
-      },
+    // Dense (Actian) + sparse (Postgres) fusion, MMR-diversified, parent-expanded —
+    // same retrieval pipeline /api/chat uses internally for RAG.
+    const { chunks } = await retrieveForQuery(query, repoId, {
+      level: filter?.level,
+      category: filter?.category,
+      language: filter?.language,
+      k: 10,
     });
 
-    const dbNodeById = new Map(dbNodes.map((n) => [n.id, n]));
-
-    const keywordCandidates = dbNodes.map((n) => ({
-      id: n.id,
-      text: n.embeddingText,
-      payload: toPayload(n as any),
-    }));
-
-    const keywordResults = keywordSearch(query, keywordCandidates);
-
-    // 4. Fuse vector search & keyword search with Reciprocal Rank Fusion (RRF, k=60)
-    const fusedResults = reciprocalRankFusion(vectorResults, keywordResults);
-    const top = fusedResults.slice(0, 10);
-
-    // 5. Expand each hit with its immediate parent's summary (small-to-big context)
-    const parentIds = Array.from(
-      new Set(top.map((r) => dbNodeById.get(r.id)?.parentId).filter((id): id is string => Boolean(id)))
-    );
-    const parents = parentIds.length
-      ? await prisma.node.findMany({ where: { id: { in: parentIds } }, select: { id: true, level: true, filePath: true, summary: true } })
-      : [];
-    const parentById = new Map(parents.map((p) => [p.id, p]));
-
     return res.json({
-      results: top.map((r) => {
-        const node = dbNodeById.get(r.id);
-        const parent = node?.parentId ? parentById.get(node.parentId) : undefined;
-        return {
-          id: r.id,
-          filePath: r.payload.filePath,
-          codeSnippet: node?.code ?? node?.summary ?? "",
-          startLine: r.payload.startLine,
-          endLine: r.payload.endLine,
-          score: r.score,
-          category: r.payload.category,
-          language: r.payload.language,
-          symbolType: r.payload.symbolType,
-          level: r.payload.level,
-          parentContext: parent ? { level: parent.level, filePath: parent.filePath, summary: parent.summary } : null,
-        };
-      }),
+      results: chunks.map((c) => ({
+        id: c.id,
+        filePath: c.filePath,
+        codeSnippet: c.text,
+        startLine: c.startLine,
+        endLine: c.endLine,
+        score: c.score,
+        category: c.category,
+        language: c.language,
+        symbolType: c.symbolType,
+        level: c.level,
+        parentContext: c.parentContext,
+      })),
     });
   } catch (err: any) {
     console.error("[search-hybrid error]:", err);

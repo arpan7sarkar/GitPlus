@@ -16,14 +16,14 @@
  */
 
 import { createHash } from "crypto";
-import { VectorAIClient, Field, type Filter } from "@actian/vectorai-client";
+import { VectorAIClient, Field, asDenseVector, type Filter } from "@actian/vectorai-client";
 
 const COLLECTION = "gitplus_nodes_v3";
 const DIMENSION = 1024;
 
 const vectorHost = process.env.ACTIAN_VECTOR_HOST || "localhost";
 const vectorPort = parseInt(process.env.ACTIAN_VECTOR_PORT || "6574", 10);
-const REST_URL = process.env.ACTIAN_VECTOR_REST_URL || "http://localhost:50051";
+const REST_URL = process.env.ACTIAN_VECTOR_REST_URL || "http://localhost:6573";
 
 // SDK singleton
 export const actianClient = new VectorAIClient(`${vectorHost}:${vectorPort}`, {
@@ -55,6 +55,7 @@ export interface SearchHit {
   id: string;
   score: number;
   payload: NodePayload;
+  vector?: number[];
 }
 
 /**
@@ -144,15 +145,23 @@ function buildFilter(filter?: Record<string, string>): Filter | undefined {
 /**
  * Perform vector similarity search with optional payload filter
  * (repoId, level, category, language, ...).
+ *
+ * `includeVectors` pulls the raw embedding back with each hit — needed by
+ * retrieval.ts to compute cosine similarity between candidates for MMR
+ * (Max Marginal Relevance) re-ranking; skipped by default since it's extra
+ * payload weight callers that only need ranked IDs (e.g. the plain
+ * /api/search/hybrid endpoint) don't need.
  */
 export async function vectorSearch(
   queryVector: number[],
   filter?: Record<string, string>,
-  limit = 10
+  limit = 10,
+  includeVectors = false
 ): Promise<SearchHit[]> {
   const searchOptions: Record<string, unknown> = {
     limit,
     with_payload: true,
+    withVectors: includeVectors,
   };
 
   const builtFilter = buildFilter(filter);
@@ -170,6 +179,7 @@ export async function vectorSearch(
     id: String(r.payload?.nodeId ?? r.id),
     score: r.score as number,
     payload: r.payload as NodePayload,
+    vector: includeVectors ? asDenseVector(r.vector) : undefined,
   }));
 }
 

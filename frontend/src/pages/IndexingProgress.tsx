@@ -29,7 +29,7 @@ const IndexingProgress = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { setRepoData, setOverview, setIndexing } = useRepoStore();
-  const { session } = useUserAuth();
+  const { session, loading: authLoading } = useUserAuth();
   const { settings } = useSettingsStore();
 
   const [currentStage, setCurrentStage] = useState(0);
@@ -57,7 +57,11 @@ const IndexingProgress = () => {
   }, [location.state, session]);
 
   useEffect(() => {
-    if (!githubUrl || (session && !githubToken) || started.current) {
+    // Wait for the initial auth check to settle before deciding whether to wait
+    // for a token — otherwise `session` is still null during that brief window
+    // and indexing fires unauthenticated even for a logged-in user, permanently
+    // locking out a retry via `started.current` once the real token arrives.
+    if (!githubUrl || authLoading || (session && !githubToken) || started.current) {
       if (session && !githubToken && githubUrl) {
         console.log("Waiting for session provider_token...");
       }
@@ -139,7 +143,14 @@ const IndexingProgress = () => {
           { name: data.meta?.name, description: data.meta?.description, language: data.meta?.language }
         )
           .then(res => console.log(`[ingest] Ingested ${res.count} code chunks for ${data.repoId}`))
-          .catch(err => console.warn("[ingest] Code chunk ingestion failed (non-blocking):", err));
+          .catch(err => {
+            console.error("[ingest] Code chunk ingestion failed:", err);
+            toast({
+              title: "Search indexing failed",
+              description: "The repo indexed, but hybrid search/chat context won't be available. " + (err instanceof Error ? err.message : "Unknown error"),
+              variant: "destructive",
+            });
+          });
 
         try {
           const overview = await generateOverview(data.repoContext);
