@@ -4,15 +4,22 @@
  * Uses @actian/vectorai-client SDK (gRPC port 6574, REST port 50051)
  *
  * Collection schema:
- *   - Collection: gitplus_code_chunks
- *   - Dimension: 1536 (OpenAI text-embedding-3-small)
+ *   - Collection: gitplus_nodes_v3
+ *   - Dimension: 1024 (OpenAI text-embedding-3-large, truncated via `dimensions` param)
  *   - Distance Metric: COSINE
+ *
+ * One flat collection holds all 4 tiers of the retrieval hierarchy (repo/module/
+ * file/symbol) — `level` is a filterable payload field rather than a named-vector
+ * space, since every tier shares the same embedding model/dimension. Filtering by
+ * `level` (e.g. "only search symbol-level chunks") is Actian's Filtered Search
+ * pattern applied to the hierarchy.
  */
 
-import { VectorAIClient } from "@actian/vectorai-client";
+import { createHash } from "crypto";
+import { VectorAIClient, Field, type Filter } from "@actian/vectorai-client";
 
-const COLLECTION = "gitplus_code_chunks";
-const DIMENSION = 1536;
+const COLLECTION = "gitplus_nodes_v3";
+const DIMENSION = 1024;
 
 const vectorHost = process.env.ACTIAN_VECTOR_HOST || "localhost";
 const vectorPort = parseInt(process.env.ACTIAN_VECTOR_PORT || "6574", 10);
@@ -23,30 +30,54 @@ export const actianClient = new VectorAIClient(`${vectorHost}:${vectorPort}`, {
   restUrl: REST_URL,
 });
 
-export interface CodeChunkPoint {
+export type NodeLevel = "repo" | "module" | "file" | "symbol";
+
+export interface NodePayload {
+  repoId: string;
+  level: NodeLevel;
+  filePath: string;
+  language: string;
+  category: string;
+  symbolType: string;
+  startLine: number;
+  endLine: number;
+  lineRange: string;
+  [key: string]: unknown;
+}
+
+export interface NodePoint {
   id: string;
   vector: number[];
-  payload: {
-    repoId: string;
-    filePath: string;
-    codeSnippet: string;
-    language: string;
-    category: string;
-    symbolType: string;
-    startLine: number;
-    endLine: number;
-    lineRange: string;
-  };
+  payload: NodePayload;
 }
 
 export interface SearchHit {
   id: string;
   score: number;
-  payload: CodeChunkPoint["payload"];
+  payload: NodePayload;
 }
 
 /**
- * Ensures the `gitplus_code_chunks` collection exists on server startup.
+ * Actian's server requires point IDs to be valid UUIDs — our own node IDs
+ * ("repoId::path:line-line") aren't. Deterministically derive a UUID-shaped id
+ * from the node id (same input always maps to the same UUID, so re-ingest
+ * upserts the same point instead of duplicating it) and carry the real node id
+ * in the payload (`nodeId`) so every caller downstream of vectorSearch() only
+ * ever sees our own IDs — this mapping is a storage-layer-only detail.
+ */
+function deterministicPointId(nodeId: string): string {
+  const hex = createHash("sha256").update(nodeId).digest("hex").slice(0, 32);
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    "4" + hex.slice(13, 16), // version 4
+    ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16) + hex.slice(17, 20), // variant 10xx
+    hex.slice(20, 32),
+  ].join("-");
+}
+
+/**
+ * Ensures the collection exists on server startup.
  */
 export async function ensureCollection(): Promise<void> {
   try {
@@ -78,9 +109,9 @@ export async function ensureCollection(): Promise<void> {
 }
 
 /**
- * Upsert chunks in batches (max 500 per batch per Actian recommendation).
+ * Upsert points in batches (max 500 per batch per Actian recommendation).
  */
-export async function upsertChunks(points: CodeChunkPoint[]): Promise<void> {
+export async function upsertChunks(points: NodePoint[]): Promise<void> {
   if (points.length === 0) return;
 
   const BATCH_SIZE = 500;
@@ -89,9 +120,9 @@ export async function upsertChunks(points: CodeChunkPoint[]): Promise<void> {
     await actianClient.points.upsert(
       COLLECTION,
       batch.map((p) => ({
-        id: p.id,
+        id: deterministicPointId(p.id),
         vector: p.vector,
-        payload: p.payload,
+        payload: { ...p.payload, nodeId: p.id },
       })),
       { wait: true } as any
     );
@@ -99,7 +130,20 @@ export async function upsertChunks(points: CodeChunkPoint[]): Promise<void> {
 }
 
 /**
- * Perform vector similarity search with optional payload filter.
+ * Builds a real Filter instance from a flat key/value map — the SDK's
+ * `points.search`/`points.delete` require an actual Field/Filter object
+ * (with methods like `.isEmpty()`), not a plain `{must: [...]}` DSL object.
+ */
+function buildFilter(filter?: Record<string, string>): Filter | undefined {
+  if (!filter) return undefined;
+  const conditions = Object.entries(filter).map(([key, value]) => new Field(`payload.${key}`).eq(value));
+  if (conditions.length === 0) return undefined;
+  return conditions.length === 1 ? conditions[0] : conditions[0].and(...conditions.slice(1));
+}
+
+/**
+ * Perform vector similarity search with optional payload filter
+ * (repoId, level, category, language, ...).
  */
 export async function vectorSearch(
   queryVector: number[],
@@ -111,14 +155,9 @@ export async function vectorSearch(
     with_payload: true,
   };
 
-  // Actian VectorAI filter DSL
-  if (filter && Object.keys(filter).length > 0) {
-    searchOptions.filter = {
-      must: Object.entries(filter).map(([key, value]) => ({
-        key: `payload.${key}`,
-        match: { value },
-      })),
-    };
+  const builtFilter = buildFilter(filter);
+  if (builtFilter) {
+    searchOptions.filter = builtFilter;
   }
 
   const results = await actianClient.points.search(
@@ -128,35 +167,24 @@ export async function vectorSearch(
   );
 
   return (results as any[]).map((r) => ({
-    id: String(r.id),
+    id: String(r.payload?.nodeId ?? r.id),
     score: r.score as number,
-    payload: r.payload as CodeChunkPoint["payload"],
+    payload: r.payload as NodePayload,
   }));
 }
 
 /**
- * Deletes points associated with a specific repoId using REST fallback filter-delete.
+ * Deletes all points for a repoId via the SDK's own filter-delete method
+ * (previously this bypassed the SDK entirely with a raw REST fetch).
  */
 export async function deleteByRepo(repoId: string): Promise<void> {
   try {
-    const res = await fetch(
-      `${REST_URL}/v1/collections/${COLLECTION}/points/delete`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filter: {
-            must: [{ key: "payload.repoId", match: { value: repoId } }],
-          },
-        }),
-      }
-    );
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.warn(`[actian] deleteByRepo response: ${res.status} ${text.slice(0, 200)}`);
-    }
+    await actianClient.points.delete(COLLECTION, {
+      filter: buildFilter({ repoId }),
+      wait: true,
+    } as any);
   } catch (err) {
-    console.warn("[actian] deleteByRepo network error:", err);
+    console.warn("[actian] deleteByRepo error:", err);
   }
 }
 

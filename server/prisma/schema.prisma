@@ -73,24 +73,49 @@ model Visit {
   @@map("visits")
 }
 
-// ─── Code Chunks (Vector Search Metadata Mirror) ────────────────────────────────
-// Mirrors the metadata of chunks stored in Actian VectorAI.
-// Used for keyword search (BM25-style) and for hybrid RRF fusion.
-model CodeChunk {
-  id          String   @id
-  repoId      String   @map("repo_id")
-  filePath    String   @map("file_path")
-  codeSnippet String   @map("code_snippet")
-  startLine   Int      @map("start_line")
-  endLine     Int      @map("end_line")
-  language    String
-  symbolType  String   @map("symbol_type")
-  category    String
-  contentHash String   @default("") @map("content_hash")
-  createdAt   DateTime @default(now()) @map("created_at")
+// ─── Nodes (Hierarchical Vector Search Metadata Mirror) ─────────────────────────
+// One unified table for all 4 tiers of the retrieval hierarchy: repo -> module ->
+// file -> symbol. Mirrors what's embedded and stored in Actian VectorAI, plus the
+// "huge context" fields (full file content, LLM summaries) Actian doesn't need to
+// hold — this table is what keyword search runs against and what retrieval walks
+// up `parentId` to expand a small symbol hit into its surrounding file/module/repo
+// context before handing it to the LLM.
+enum NodeLevel {
+  repo
+  module
+  file
+  symbol
+}
+
+model Node {
+  id               String    @id
+  repoId           String    @map("repo_id")
+  level            NodeLevel
+  parentId         String?   @map("parent_id")
+  parent           Node?     @relation("NodeHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children         Node[]    @relation("NodeHierarchy")
+
+  filePath         String?   @map("file_path") // set at file/symbol level, null for module/repo
+  symbolName       String?   @map("symbol_name") // symbol level only
+  parentSymbolPath String?   @map("parent_symbol_path") // e.g. enclosing class name, for methods
+  symbolType       String?   @map("symbol_type") // function|class|method|interface|enum|type|config
+  language         String?
+  startLine        Int?      @map("start_line")
+  endLine          Int?      @map("end_line")
+
+  code             String?   // raw source, symbol level only
+  content          String?   // full raw file text, file level only ("huge context")
+  summary          String?   // LLM-generated summary, file/module/repo level
+  embeddingText    String    @default("") @map("embedding_text") // what was actually embedded + what keyword search runs against
+
+  category         String?
+  contentHash      String    @default("") @map("content_hash")
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   @@index([repoId])
-  @@index([category])
+  @@index([repoId, level])
+  @@index([parentId])
   @@index([filePath])
-  @@map("code_chunks")
+  @@index([category])
+  @@map("nodes")
 }

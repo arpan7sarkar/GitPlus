@@ -7,19 +7,20 @@
 import { reciprocalRankFusion as actianRRF } from "@actian/vectorai-client";
 import type { SearchHit } from "./actian.js";
 
-export interface KeywordHit {
+export interface KeywordCandidate {
   id: string;
-  score: number;
+  text: string; // the same embeddingText that was embedded (code+context or summary) — keeps sparse/dense search aligned
   payload: SearchHit["payload"];
 }
 
+export interface KeywordHit extends KeywordCandidate {
+  score: number;
+}
+
 /**
- * Keyword search (BM25-style term frequency) over chunk candidates
+ * Keyword search (BM25-style term frequency) over node candidates
  */
-export function keywordSearch(
-  query: string,
-  candidates: { id: string; payload: SearchHit["payload"] }[]
-): KeywordHit[] {
+export function keywordSearch(query: string, candidates: KeywordCandidate[]): KeywordHit[] {
   const terms = query
     .toLowerCase()
     .split(/\s+/)
@@ -28,15 +29,7 @@ export function keywordSearch(
   if (terms.length === 0) return [];
 
   const scored = candidates.map((c) => {
-    const text = [
-      c.payload.codeSnippet,
-      c.payload.filePath,
-      c.payload.category,
-      c.payload.symbolType,
-    ]
-      .join(" ")
-      .toLowerCase();
-
+    const text = c.text.toLowerCase();
     let score = 0;
     for (const term of terms) {
       const matches = (text.match(new RegExp(escapeRegex(term), "gi")) || []).length;

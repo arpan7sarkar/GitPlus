@@ -70,7 +70,7 @@ const FALLBACK_CHUNK_SIZE = 40;
 const FALLBACK_STEP = 30; // 10-line overlap
 const BOUNDARY_SNAP_DRIFT = 8;
 
-function detectCategory(text: string): NodeCategory {
+export function detectCategory(text: string): NodeCategory {
   const lower = text.toLowerCase();
   if (/auth|token|jwt|login|session|password|clerk|bearer/.test(lower)) return "auth";
   if (/select|insert|update|delete|prisma|table|migration|schema|from\s/.test(lower)) return "database";
@@ -80,7 +80,7 @@ function detectCategory(text: string): NodeCategory {
   return "utility";
 }
 
-function hash(text: string): string {
+export function hash(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 16);
 }
 
