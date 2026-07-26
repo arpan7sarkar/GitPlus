@@ -130,7 +130,7 @@ router.post("/hybrid", async (req: Request, res: Response) => {
       },
     });
 
-    const keywordCandidates = dbChunks.map((c) => ({
+    const keywordCandidates = dbChunks.map((c: any) => ({
       id: c.id,
       payload: {
         repoId,
