@@ -11,6 +11,7 @@ import issuesRouter from "./routes/issues.js";
 import sessionsRouter from "./routes/sessions.js";
 import visitsRouter from "./routes/visits.js";
 import searchRouter from "./routes/search.js";
+import vexreviewRouter from "./routes/vexreview.js";
 
 import { ensureCollection, countPoints } from "./lib/actian.js";
 import { prisma } from "./lib/prisma.js";
@@ -45,6 +46,7 @@ app.use("/api/repo", issuesRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/visits", visitsRouter);
 app.use("/api/search", searchRouter);
+app.use("/api/vexreview", vexreviewRouter);
 
 // Health Check Endpoint (Postgres + Actian status)
 app.get("/health", async (_req, res) => {

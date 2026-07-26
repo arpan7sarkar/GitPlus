@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Code2, Github, User, LogOut, Search, Brain, Zap, MessageSquare, Shield, GitBranch, Settings as SettingsIcon } from "lucide-react";
+import { ChevronLeft, Code2, Github, User, LogOut, Search, Brain, Zap, MessageSquare, Shield, GitBranch, FolderGit2, Settings as SettingsIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserAuth } from "@/hooks/use-user-auth";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -70,6 +70,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({ title, subtitle, children, cate
                   <DropdownMenuSeparator className="bg-border/40" />
                   <DropdownMenuItem onClick={() => navigate("/profile")} className="text-[10px] uppercase tracking-widest focus:bg-accent cursor-pointer">
                     <User className="mr-2 h-3.5 w-3.5" /> Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/repos")} className="text-[10px] uppercase tracking-widest focus:bg-accent cursor-pointer">
+                    <FolderGit2 className="mr-2 h-3.5 w-3.5" /> My Repos
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/settings")} className="text-[10px] uppercase tracking-widest focus:bg-accent cursor-pointer">
                     <SettingsIcon className="mr-2 h-3.5 w-3.5" /> Settings

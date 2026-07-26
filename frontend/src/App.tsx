@@ -25,6 +25,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Contact from "./pages/Contact";
 import Profile from "./pages/Profile";
+import MyRepos from "./pages/MyRepos";
 import Settings from "./pages/Settings";
 import OurPhilosophy from "./pages/OurPhilosophy";
 import CLIPage from "./pages/CLIPage";
@@ -64,6 +65,7 @@ const App = () => {
               <Route path="/terms" element={<Terms />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/repos" element={<MyRepos />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/our-philosophy" element={<OurPhilosophy />} />
               <Route path="*" element={<NotFound />} />

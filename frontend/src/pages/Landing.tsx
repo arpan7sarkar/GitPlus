@@ -4,7 +4,7 @@ import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import {
   ArrowRight, Zap, MessageSquare, FileCode, Code2, Lock, ChevronDown,
   Shield, GitBranch, Search, Brain, BarChart3, Bug, Github, LogOut, User, Settings as SettingsIcon,
-  Sparkles, Terminal, Package, Download, Boxes, Cpu, Copy, Check, Play, Layers
+  Sparkles, Terminal, Package, Download, Boxes, Cpu, Copy, Check, Play, Layers, FolderGit2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -245,6 +245,15 @@ const Landing = () => {
             <ThemeToggle />
 
             {user ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/repos")}
+                  className="h-9 px-4 text-[13px] font-medium rounded-full border-border hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <FolderGit2 className="h-3.5 w-3.5 mr-1.5" /> My Repos
+                </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-9 w-9 rounded-full border border-border p-0 overflow-hidden hover:bg-muted">
@@ -266,6 +275,10 @@ const Landing = () => {
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/repos")} className="text-xs py-3 px-4 cursor-pointer">
+                    <FolderGit2 className="mr-2 h-4 w-4" />
+                    <span>My Repos</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/settings")} className="text-xs py-3 px-4 cursor-pointer">
                     <SettingsIcon className="mr-2 h-4 w-4" />
                     <span>Settings</span>
@@ -277,6 +290,7 @@ const Landing = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             ) : (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setShowLoginDialog(true)} className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -611,7 +625,7 @@ const Landing = () => {
                 variant="ghost"
                 size="lg"
                 onClick={() => navigate("/our-philosophy")}
-                className="h-12 px-8 rounded-full border border-background/20 text-background font-semibold text-sm hover:bg-background/10"
+                className="h-12 px-8 rounded-full border border-background/20 text-background font-semibold text-sm hover:bg-background/10 hover:text-background"
               >
                 Our philosophy
               </Button>
