@@ -9,6 +9,7 @@ import { useUserAuth } from "@/hooks/use-user-auth";
 import { toast } from "@/hooks/use-toast";
 import { useSettingsStore } from "@/lib/settings-store";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { safeSetRepoCache } from "@/lib/repo-cache";
 
 const STAGES_FULL = [
   { label: "Fetching file tree", icon: GitBranch },
@@ -130,7 +131,7 @@ const IndexingProgress = () => {
 
         // Save to cache if enabled
         if (settings.cacheIndexData) {
-          localStorage.setItem(`repo_cache_${githubUrl}`, JSON.stringify(repoData));
+          safeSetRepoCache(`repo_cache_${githubUrl}`, repoData);
         }
 
         setCurrentStage(4);
@@ -140,7 +141,14 @@ const IndexingProgress = () => {
         ingestCodeChunks(
           data.repoId,
           data.fileContents.map(f => ({ path: f.path, content: f.content })),
-          { name: data.meta?.name, description: data.meta?.description, language: data.meta?.language }
+          {
+            name: data.meta?.name,
+            owner: data.meta?.owner,
+            description: data.meta?.description,
+            language: data.meta?.language,
+            stars: data.meta?.stars,
+            forks: data.meta?.forks,
+          }
         )
           .then(res => console.log(`[ingest] Ingested ${res.count} code chunks for ${data.repoId}`))
           .catch(err => {
@@ -164,12 +172,12 @@ const IndexingProgress = () => {
               try {
                 const cachedData = JSON.parse(cached);
                 cachedData.overview = overview;
-                localStorage.setItem(cacheKey, JSON.stringify(cachedData));
+                safeSetRepoCache(cacheKey, cachedData);
               } catch { /* ignore */ }
             }
           }
           // Also persist with repo-specific key for direct navigation
-          localStorage.setItem(`repo_data_${data.repoId}`, JSON.stringify({ ...repoData, overview }));
+          safeSetRepoCache(`repo_data_${data.repoId}`, { ...repoData, overview });
         } catch (e) {
           console.error("Overview generation failed:", e);
         }

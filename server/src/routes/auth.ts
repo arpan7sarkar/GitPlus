@@ -203,6 +203,19 @@ router.get("/repos", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/auth/indexed-repos — repos this user has analyzed on GitPlus (not GitHub's list)
+router.get("/indexed-repos", async (req: Request, res: Response) => {
+  const user = await getSessionUser(readSessionToken(req));
+  if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+  const repos = await prisma.indexedRepo.findMany({
+    where: { userId: user.id },
+    orderBy: { lastIndexedAt: "desc" },
+  });
+
+  return res.json({ repos });
+});
+
 // POST /api/auth/logout
 router.post("/logout", async (req: Request, res: Response) => {
   await destroySession(readSessionToken(req));

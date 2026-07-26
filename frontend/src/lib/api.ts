@@ -421,7 +421,7 @@ export async function fetchFileBatch(params: {
 export async function ingestCodeChunks(
   repoId: string,
   files: { path: string; content: string }[],
-  repoMeta?: { name?: string; description?: string; language?: string }
+  repoMeta?: { name?: string; owner?: string; description?: string; language?: string; stars?: number; forks?: number }
 ): Promise<IngestResponse> {
   return apiRequest<IngestResponse>("/search/ingest", {
     method: "POST",
@@ -572,4 +572,76 @@ export async function fetchUserRepositories(): Promise<any[]> {
  */
 export async function logoutUser(): Promise<void> {
   await apiRequest<{ success: boolean }>("/auth/logout", { method: "POST" });
+}
+
+export interface IndexedRepoEntry {
+  id: string;
+  repoId: string;
+  owner: string;
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number | null;
+  forks: number | null;
+  lastIndexedAt: string;
+  createdAt: string;
+}
+
+/**
+ * GET /api/auth/indexed-repos — Repos this user has analyzed on GitPlus (distinct
+ * from /auth/repos, which lists their raw GitHub repos available to index).
+ */
+export async function fetchIndexedRepos(): Promise<IndexedRepoEntry[]> {
+  const res = await apiRequest<{ repos: IndexedRepoEntry[] }>("/auth/indexed-repos");
+  return res.repos;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VexReview — AI PR Reviewer (runs server-side, posts real GitHub review comments)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface VexReviewRun {
+  id: string;
+  configId: string;
+  userId: string;
+  prNumber: number;
+  status: "queued" | "running" | "completed" | "failed";
+  stage: string | null;
+  stageMessage: string | null;
+  resultStatus: "reviewed" | "skipped" | "rejected_sensitive_files" | null;
+  filesReviewed: number | null;
+  reviewComments: number | null;
+  lgtmCount: number | null;
+  error: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export async function fetchVexReviewStatus(owner: string, repo: string): Promise<{ enabled: boolean; runs: VexReviewRun[] }> {
+  const params = new URLSearchParams({ owner, repo });
+  return apiRequest(`/vexreview/status?${params.toString()}`);
+}
+
+export async function enableVexReview(owner: string, repo: string): Promise<void> {
+  await apiRequest("/vexreview/enable", { method: "POST", body: JSON.stringify({ owner, repo }) });
+}
+
+export async function disableVexReview(owner: string, repo: string): Promise<void> {
+  await apiRequest("/vexreview/disable", { method: "POST", body: JSON.stringify({ owner, repo }) });
+}
+
+export async function triggerVexReview(
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<{ runId: string; alreadyRunning: boolean }> {
+  return apiRequest("/vexreview/review", {
+    method: "POST",
+    body: JSON.stringify({ owner, repo, prNumber }),
+  });
+}
+
+export async function fetchVexReviewRun(runId: string): Promise<VexReviewRun> {
+  const res = await apiRequest<{ run: VexReviewRun }>(`/vexreview/runs/${runId}`);
+  return res.run;
 }

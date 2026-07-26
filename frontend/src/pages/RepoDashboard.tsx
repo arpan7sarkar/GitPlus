@@ -24,9 +24,10 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useUserAuth } from "@/hooks/use-user-auth";
-import { LogOut, User as UserIcon, Settings as SettingsIcon } from "lucide-react";
+import { LogOut, User as UserIcon, Settings as SettingsIcon, FolderGit2 } from "lucide-react";
 import { indexRepository, generateOverview, ingestCodeChunks } from "@/lib/api";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { safeSetRepoCache } from "@/lib/repo-cache";
 
 const QUESTION_ICONS = [LogIn, Info, Database, GitBranch];
 
@@ -102,10 +103,14 @@ const RepoDashboard = () => {
         setRepoData(repoData as any);
 
         // Cache for future visits
-        localStorage.setItem(`repo_data_${repoId}`, JSON.stringify(repoData));
+        safeSetRepoCache(`repo_data_${repoId}`, repoData);
 
         // Ingest code chunks to Actian VectorAI for hybrid search (background)
-        ingestCodeChunks(data.repoId, data.fileContents.map((f: any) => ({ path: f.path, content: f.content })))
+        ingestCodeChunks(
+          data.repoId,
+          data.fileContents.map((f: any) => ({ path: f.path, content: f.content })),
+          { name: data.meta?.name, owner: data.meta?.owner, description: data.meta?.description, language: data.meta?.language, stars: data.meta?.stars, forks: data.meta?.forks }
+        )
           .then(res => console.log(`[ingest] Dashboard ingested ${res.count} chunks`))
           .catch(err => console.warn("[ingest] Dashboard ingestion failed:", err));
 
@@ -115,7 +120,7 @@ const RepoDashboard = () => {
           const overview = await generateOverview(data.repoContext);
           setOverview(overview as any);
           // Persist overview to cache
-          localStorage.setItem(`repo_data_${repoId}`, JSON.stringify({ ...repoData, overview }));
+          safeSetRepoCache(`repo_data_${repoId}`, { ...repoData, overview });
         } catch (e) {
           console.error("Overview generation failed:", e);
           setOverviewError(e instanceof Error ? e.message : "Failed to generate overview");
@@ -149,7 +154,7 @@ const RepoDashboard = () => {
             if (cached) {
               const data = JSON.parse(cached);
               data.overview = overview;
-              localStorage.setItem(`repo_data_${repoId}`, JSON.stringify(data));
+              safeSetRepoCache(`repo_data_${repoId}`, data);
             }
           } catch { /* ignore */ }
         }
@@ -303,6 +308,10 @@ const RepoDashboard = () => {
                   <DropdownMenuItem onClick={() => navigate("/profile")} className="text-xs py-3 px-4 cursor-pointer">
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/repos")} className="text-xs py-3 px-4 cursor-pointer">
+                    <FolderGit2 className="mr-2 h-4 w-4" />
+                    <span>My Repos</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/settings")} className="text-xs py-3 px-4 cursor-pointer">
                     <SettingsIcon className="mr-2 h-4 w-4" />

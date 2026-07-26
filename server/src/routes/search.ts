@@ -21,6 +21,7 @@ import { generateEmbeddingsBatch } from "../lib/embeddings.js";
 import { chunkCodeFiles, detectCategory, hash, type FileNode, type SymbolChunk } from "../lib/chunker.js";
 import { summarizeFile, summarizeModule, summarizeRepo, mapWithConcurrency } from "../lib/summarize.js";
 import { retrieveForQuery } from "../lib/retrieval.js";
+import { getSessionUser, readSessionToken } from "../lib/auth.js";
 
 const router = Router();
 
@@ -66,7 +67,14 @@ router.post("/ingest", async (req: Request, res: Response) => {
     const { repoId, files, repoMeta } = req.body as {
       repoId: string;
       files: { path: string; content: string }[];
-      repoMeta?: { name?: string; description?: string; language?: string };
+      repoMeta?: {
+        name?: string;
+        owner?: string;
+        description?: string;
+        language?: string;
+        stars?: number;
+        forks?: number;
+      };
     };
 
     if (!repoId || !Array.isArray(files)) {
@@ -237,6 +245,44 @@ router.post("/ingest", async (req: Request, res: Response) => {
       `[search-ingest] Indexed ${nodes.length} nodes for repoId: ${repoId} ` +
         `(1 repo, ${moduleSummaries.length} modules, ${fileNodes.length} files, ${symbolChunks.length} symbols)`
     );
+
+    // 10. If the requester is logged in, record this repo against their account
+    // (powers the "My Repos" page — the Node hierarchy above has no userId,
+    // it's keyed only by repoId, so this is the only user<->repo association).
+    // Non-fatal: the expensive work above (embeddings, Actian, Postgres nodes)
+    // already succeeded by this point, so a failure here shouldn't turn the
+    // whole ingest into an error — it would just mean re-indexing is needed to
+    // pick the repo up in the list.
+    if (repoMeta?.owner && repoMeta?.name) {
+      try {
+        const user = await getSessionUser(readSessionToken(req));
+        if (user) {
+          await prisma.indexedRepo.upsert({
+            where: { userId_repoId: { userId: user.id, repoId } },
+            create: {
+              userId: user.id,
+              repoId,
+              owner: repoMeta.owner,
+              name: repoMeta.name,
+              description: repoMeta.description || null,
+              language: repoMeta.language || null,
+              stars: repoMeta.stars ?? null,
+              forks: repoMeta.forks ?? null,
+            },
+            update: {
+              description: repoMeta.description || null,
+              language: repoMeta.language || null,
+              stars: repoMeta.stars ?? null,
+              forks: repoMeta.forks ?? null,
+              lastIndexedAt: new Date(),
+            },
+          });
+        }
+      } catch (err) {
+        console.error("[search-ingest] Failed to record IndexedRepo (non-fatal):", err);
+      }
+    }
+
     return res.json({ success: true, count: nodes.length });
   } catch (err: any) {
     console.error("[search-ingest error]:", err);
