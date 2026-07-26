@@ -1,0 +1,519 @@
+/**
+ * API Service Layer — GitPlus Frontend ↔ Express Backend
+ *
+ * All functions call the Express server at /api/* endpoints.
+ * In development, Vite's proxy forwards these to http://localhost:3000.
+ * In production, set VITE_API_BASE_URL to the deployed server URL.
+ */
+
+import type {
+  IndexedRepo,
+  SecurityFinding,
+  GitHubIssue,
+  GitHubPullRequest,
+  GitHubCommit,
+  RepoFileContent,
+  BatchFetchResult,
+  OverviewData,
+  SearchResult,
+  HybridSearchResponse,
+  IngestResponse,
+  HealthResponse,
+  ChatSessionData,
+  VisitStats,
+} from "@/types/backend";
+
+// Re-export backend data types for convenience across the app
+export type {
+  IndexedRepo,
+  SecurityFinding,
+  GitHubIssue,
+  GitHubPullRequest,
+  GitHubCommit,
+  RepoFileContent,
+  BatchFetchResult,
+  OverviewData,
+  SearchResult,
+  HybridSearchResponse,
+  IngestResponse,
+  HealthResponse,
+  ChatSessionData,
+  VisitStats,
+};
+
+// In dev, the Vite proxy handles /api → localhost:3000 so we can use relative URLs.
+// In production, set VITE_API_BASE_URL to the full server URL (e.g. https://api.gitplus.dev/api).
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+
+// Resolve base URL: strip trailing slash for consistent path joining
+const BASE = API_BASE_URL.replace(/\/+$/, "");
+
+// ─── Helper ────────────────────────────────────────────────────────────────────
+
+async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = path.startsWith("http") ? path : `${BASE}${path}`;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(errBody.error || errBody.message || `Request failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Repository Indexing
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/repo/index — Indexes a GitHub repository.
+ */
+export async function indexRepository(
+  githubUrl: string,
+  githubToken?: string,
+  onProgress?: (stage: number, message: string) => void
+): Promise<IndexedRepo> {
+  onProgress?.(1, "Connecting to repository...");
+
+  const res = await fetch(`${BASE}/repo/index`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ githubUrl, githubToken }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(errBody.error || "Failed to index repository");
+  }
+
+  const data = await res.json();
+
+  // The server may return an error in the body (non-HTTP error)
+  if (data.error) {
+    throw new Error(data.error);
+  }
+
+  onProgress?.(4, "Indexing complete.");
+  return data as IndexedRepo;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI Chat & Actions (all go through POST /api/chat with different `action` values)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/chat with action: "overview" — Generates repository overview.
+ * Server returns { content: "JSON string" } — we parse the inner JSON.
+ */
+export async function generateOverview(repoContext: string): Promise<OverviewData> {
+  const res = await apiRequest<{ content: string }>("/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      messages: [],
+      repoContext,
+      action: "overview",
+    }),
+  });
+
+  // The server returns the overview as a JSON string inside `content`
+  try {
+    return JSON.parse(res.content) as OverviewData;
+  } catch {
+    // If parsing fails, return a basic structure from the raw content
+    return {
+      narrative: res.content,
+      framework: "Unknown",
+      complexity: "Unknown",
+      suggestedQs: [],
+      keyFiles: [],
+      keyPatterns: [],
+      mainDeps: [],
+      languages: [],
+    };
+  }
+}
+
+/**
+ * POST /api/chat with action: "security" — Security audit scan.
+ * Server returns { content: "JSON array string" }.
+ */
+export async function generateSecurityScan(repoContext: string): Promise<SecurityFinding[]> {
+  const res = await apiRequest<{ content: string }>("/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      messages: [],
+      repoContext,
+      action: "security",
+    }),
+  });
+
+  try {
+    return JSON.parse(res.content) as SecurityFinding[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * POST /api/chat with action: "system-design" — System design documentation.
+ * Server returns { content: "markdown string" }.
+ */
+export async function generateSystemDesign(repoContext: string): Promise<string> {
+  const res = await apiRequest<{ content: string }>("/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      messages: [],
+      repoContext,
+      action: "system-design",
+    }),
+  });
+
+  return res.content;
+}
+
+/**
+ * POST /api/chat with action: "onboarding" — Onboarding documentation.
+ * Server returns { content: "markdown string" }.
+ */
+export async function generateOnboardingDoc(repoContext: string): Promise<string> {
+  const res = await apiRequest<{ content: string }>("/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      messages: [],
+      repoContext,
+      action: "onboarding",
+    }),
+  });
+
+  return res.content;
+}
+
+/**
+ * POST /api/chat with action: "chat" — SSE streaming chat.
+ * Server responds with text/event-stream.
+ */
+export async function streamChat(params: {
+  messages: Array<{ role: string; content: string }>;
+  repoContext?: string;
+  onChunk?: (chunk: string) => void;
+}) {
+  const res = await fetch(`${BASE}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: params.messages,
+      repoContext: params.repoContext || "",
+      action: "chat",
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(errBody.error || "Chat request failed");
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) return;
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE lines: "data: {...}\n\n"
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || ""; // Keep incomplete last line in buffer
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "data: [DONE]") continue;
+
+      if (trimmed.startsWith("data: ")) {
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+          const content = json.choices?.[0]?.delta?.content;
+          if (content) {
+            params.onChunk?.(content);
+          }
+        } catch {
+          // Not valid JSON SSE — might be raw text stream, pass through
+          params.onChunk?.(trimmed.slice(6));
+        }
+      }
+    }
+  }
+
+  // Flush remaining buffer
+  if (buffer.trim() && buffer.trim() !== "data: [DONE]") {
+    const trimmed = buffer.trim();
+    if (trimmed.startsWith("data: ")) {
+      try {
+        const json = JSON.parse(trimmed.slice(6));
+        const content = json.choices?.[0]?.delta?.content;
+        if (content) params.onChunk?.(content);
+      } catch {
+        // pass
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GitHub Data: Issues, PRs, Commits
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/repo/issues — Fetches repository issues.
+ * Server returns { issues: [...] }.
+ */
+export async function fetchIssues(
+  owner: string,
+  repo: string,
+  state: "open" | "closed" = "open",
+  githubToken?: string
+): Promise<GitHubIssue[]> {
+  const res = await apiRequest<{ issues: GitHubIssue[] }>("/repo/issues", {
+    method: "POST",
+    body: JSON.stringify({ owner, repo, state, githubToken }),
+  });
+
+  return res.issues;
+}
+
+/**
+ * GET /api/repo/pulls — Fetches pull requests.
+ * Server returns { pulls: [...] }.
+ */
+export async function fetchPullRequests(
+  owner: string,
+  repo: string,
+  state: "open" | "closed" | "all" = "open",
+  githubToken?: string
+): Promise<GitHubPullRequest[]> {
+  const params = new URLSearchParams({ owner, repo, state });
+  if (githubToken) params.set("githubToken", githubToken);
+
+  const res = await apiRequest<{ pulls: GitHubPullRequest[] }>(
+    `/repo/pulls?${params.toString()}`
+  );
+
+  return res.pulls;
+}
+
+/**
+ * GET /api/repo/commits — Fetches recent commits.
+ * Server returns { commits: [...] }.
+ */
+export async function fetchCommits(
+  owner: string,
+  repo: string,
+  githubToken?: string
+): Promise<GitHubCommit[]> {
+  const params = new URLSearchParams({ owner, repo });
+  if (githubToken) params.set("githubToken", githubToken);
+
+  const res = await apiRequest<{ commits: GitHubCommit[] }>(
+    `/repo/commits?${params.toString()}`
+  );
+
+  return res.commits;
+}
+
+/**
+ * GET /api/repo/pulls/:pr/diff — Fetches PR diff text.
+ * Server returns plain text.
+ */
+export async function fetchPullRequestDiff(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  githubToken?: string
+): Promise<string> {
+  const params = new URLSearchParams({ owner, repo });
+  if (githubToken) params.set("githubToken", githubToken);
+
+  const url = `${BASE}/repo/pulls/${prNumber}/diff?${params.toString()}`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch PR diff: HTTP ${res.status}`);
+  }
+
+  return res.text();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// File Content Fetching
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/repo/file — Fetches content of a single file.
+ */
+export async function fetchFileContent(params: {
+  owner: string;
+  repo: string;
+  path: string;
+  githubToken?: string;
+}): Promise<RepoFileContent> {
+  return apiRequest<RepoFileContent>("/repo/file", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+/**
+ * POST /api/repo/fetch-batch — Batch fetches content for multiple files.
+ */
+export async function fetchFileBatch(params: {
+  owner: string;
+  repo: string;
+  paths: string[];
+  githubToken?: string;
+}): Promise<BatchFetchResult> {
+  return apiRequest<BatchFetchResult>("/repo/fetch-batch", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Vector Search — Ingest & Hybrid Search
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/search/ingest — Ingests code chunks into Actian VectorAI + Prisma.
+ */
+export async function ingestCodeChunks(
+  repoId: string,
+  files: { path: string; content: string }[]
+): Promise<IngestResponse> {
+  return apiRequest<IngestResponse>("/search/ingest", {
+    method: "POST",
+    body: JSON.stringify({ repoId, files }),
+  });
+}
+
+/**
+ * POST /api/search/hybrid — Performs hybrid RRF search.
+ */
+export async function hybridSearch(
+  query: string,
+  repoId: string,
+  filter?: { category?: string; language?: string }
+): Promise<SearchResult[]> {
+  const res = await apiRequest<HybridSearchResponse>("/search/hybrid", {
+    method: "POST",
+    body: JSON.stringify({ query, repoId, filter }),
+  });
+
+  return res.results;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Chat Sessions — CRUD via Express /api/sessions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/sessions — Creates a new chat session.
+ */
+export async function createSession(
+  repoId: string,
+  repoMeta: Record<string, unknown>,
+  repoContext: string,
+  userId?: string
+): Promise<string> {
+  const res = await apiRequest<{ id: string }>("/sessions", {
+    method: "POST",
+    body: JSON.stringify({ repoId, repoMeta, repoContext, userId }),
+  });
+
+  return res.id;
+}
+
+/**
+ * GET /api/sessions/:id — Loads a chat session by ID.
+ */
+export async function loadSession(sessionId: string): Promise<ChatSessionData> {
+  return apiRequest<ChatSessionData>(`/sessions/${sessionId}`);
+}
+
+/**
+ * PUT /api/sessions/:id — Updates the messages in a chat session.
+ */
+export async function updateSession(
+  sessionId: string,
+  messages: Array<{ role: string; content: string; timestamp?: string }>
+): Promise<void> {
+  await apiRequest<{ success: boolean }>(`/sessions/${sessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ messages }),
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Visitor Analytics
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/visits/track — Records a visitor analytics event.
+ */
+export async function trackVisit(visitorId: string): Promise<void> {
+  await apiRequest<{ success: boolean }>("/visits/track", {
+    method: "POST",
+    body: JSON.stringify({ visitor_id: visitorId }),
+  });
+}
+
+/**
+ * GET /api/visits/stats — Returns total unique visitor count.
+ */
+export async function fetchVisitStats(): Promise<VisitStats> {
+  return apiRequest<VisitStats>("/visits/stats");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Health Check
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /health — Server health check (Postgres + Actian VectorAI status).
+ * Note: This endpoint is NOT under /api, it's at the root level.
+ */
+export async function checkHealth(): Promise<HealthResponse> {
+  const res = await fetch("/health");
+  if (!res.ok) {
+    throw new Error(`Health check failed: HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Auth (placeholder — no-op until Clerk is wired)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Authenticates user and fetches profile/roles safely.
+ * Currently a no-op passthrough since auth is handled separately.
+ */
+export async function authenticateAndFetchUserData(userData?: any) {
+  if (!userData?.profile?.roles?.[0]?.name) {
+    return { authenticated: false, role: "guest", profile: null };
+  }
+
+  const primaryRole = userData.profile.roles[0].name.toLowerCase();
+  return { authenticated: true, role: primaryRole, profile: userData.profile };
+}
