@@ -6,4 +6,5 @@ docs
 .claude
 .windsurf
 local_data
+dist
 extra/

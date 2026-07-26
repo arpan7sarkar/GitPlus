@@ -1,14 +1,30 @@
 version: "3.9"
 services:
-  vectorai:
+  actian-vectorai:
     image: actian/vectorai:latest
-    container_name: vectorai
+    container_name: gitplus-vectorai
     ports:
-      - "6573:6573"
-      - "6574:6574"
-      - "6575:6575"
+      - "50051:50051"   # REST API
+      - "6574:6574"     # gRPC / SDK port
     volumes:
-      - ./local_data:/var/lib/actian-vectorai
+      - vectorai_data:/data
     environment:
-      - ACTIAN_VECTORAI_ACCEPT_EULA=YES
+      - VECTORAI_DATA_DIR=/data
     restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: gitplus-postgres
+    environment:
+      POSTGRES_USER: neondb_owner
+      POSTGRES_PASSWORD: neondb_password
+      POSTGRES_DB: neondb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  vectorai_data:
+  postgres_data:
