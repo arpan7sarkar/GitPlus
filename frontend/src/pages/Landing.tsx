@@ -223,27 +223,22 @@ const Landing = () => {
       <p className="text-[10px] text-muted-foreground">Paste any GitHub URL to get started.</p>
     </div>
   ) : (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-teal-500/30 relative">
-      {/* Global Blueprint Grid Overlay */}
-      <div className="fixed inset-0 blueprint-grid pointer-events-none z-0" />
-
-      {/* Plus Markers for global grid (optional, can be per section) */}
-
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/25 relative">
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-between h-14 px-6">
-          <div className="flex items-center gap-2 group cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-all">
-              <Code2 className="h-5 w-5 text-primary" />
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto flex items-center justify-between h-16 px-6">
+          <div className="flex items-center gap-2.5 group cursor-pointer" onClick={() => navigate('/')}>
+            <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/15 transition-all">
+              <Code2 className="h-4.5 w-4.5 text-primary" />
             </div>
-            <span className="font-mono text-sm font-bold tracking-tighter uppercase transition-colors group-hover:text-primary">GitPlus</span>
+            <span className="font-display text-base font-bold tracking-tight transition-colors group-hover:text-primary">GitPlus</span>
           </div>
 
-          <div className="hidden md:flex items-center gap-8">
-            <Link to="/features" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.2em]">Features</Link>
-            <Link to="/how-it-works" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.2em]">How it works</Link>
-            <Link to="/faq" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.2em]">FAQ</Link>
-            <Link to="/docs" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.2em]">Docs</Link>
+          <div className="hidden md:flex items-center gap-1">
+            <Link to="/features" className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-muted">Features</Link>
+            <Link to="/how-it-works" className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-muted">How it works</Link>
+            <Link to="/faq" className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-muted">FAQ</Link>
+            <Link to="/docs" className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-muted">Docs</Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -252,7 +247,7 @@ const Landing = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-9 w-9 rounded-full border border-white/10 p-0 overflow-hidden hover:bg-white/5">
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full border border-border p-0 overflow-hidden hover:bg-muted">
                     <Avatar className="h-full w-full">
                       <AvatarImage src={user.user_metadata.avatar_url} />
                       <AvatarFallback className="bg-muted text-[10px] font-bold">{user.user_metadata.user_name?.[0]}</AvatarFallback>
@@ -266,16 +261,16 @@ const Landing = () => {
                       <span className="text-[10px] text-muted-foreground font-medium">{user.email}</span>
                     </div>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-white/5" />
-                  <DropdownMenuItem onClick={() => navigate("/profile")} className="text-xs py-3 px-4 focus:bg-white/5 cursor-pointer">
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/profile")} className="text-xs py-3 px-4 cursor-pointer">
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/settings")} className="text-xs py-3 px-4 focus:bg-white/5 cursor-pointer">
+                  <DropdownMenuItem onClick={() => navigate("/settings")} className="text-xs py-3 px-4 cursor-pointer">
                     <SettingsIcon className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/5" />
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => logout()} className="text-xs py-3 px-4 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
@@ -283,11 +278,11 @@ const Landing = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => setShowLoginDialog(true)} className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-colors">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setShowLoginDialog(true)} className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors">
                   Log in
                 </Button>
-                <Button size="sm" onClick={() => setShowLoginDialog(true)} className="h-9 px-5 text-[10px] font-black uppercase tracking-[0.2em] bg-teal-500 text-black hover:bg-teal-400 transition-all rounded-full shadow-[0_0_20px_rgba(20,184,166,0.2)]">
+                <Button size="sm" onClick={() => setShowLoginDialog(true)} className="h-9 px-4 text-[13px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all rounded-full">
                   Try GitPlus
                 </Button>
               </div>
@@ -297,243 +292,214 @@ const Landing = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-48 overflow-hidden border-b border-white/5">
-        {/* Teal Glows */}
-        <div className="teal-glow w-[800px] h-[800px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-30" />
-        <div className="teal-glow w-[400px] h-[400px] top-1/4 left-1/4 opacity-15" />
+      <section className="relative pt-40 pb-32 overflow-hidden">
+        <div className="radial-glow w-[700px] h-[700px] top-0 left-1/2 -translate-x-1/2 -translate-y-1/3" />
 
-        {/* Corner Frames */}
-        <div className="corner-frame corner-frame-tl ml-8 mt-8" />
-        <div className="corner-frame corner-frame-tr mr-8 mt-8" />
-        <div className="corner-frame corner-frame-bl ml-8 mb-8" />
-        <div className="corner-frame corner-frame-br mr-8 mb-8" />
-
-        {/* Diagonal Guide Lines */}
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden opacity-10">
-          <div className="absolute top-0 left-0 w-[200%] h-px bg-teal-500/20 -rotate-45 origin-top-left" />
-          <div className="absolute bottom-0 right-0 w-[200%] h-px bg-teal-500/20 -rotate-45 origin-bottom-right" />
-        </div>
-
-        {/* Grid Lines & Intersections */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="grid-line-v left-1/2 -translate-x-1/2 opacity-10" />
-          <div className="grid-line-h top-1/4 opacity-10" />
-          <div className="grid-line-h top-3/4 opacity-10" />
-
-        </div>
-
-        <div className="max-w-7xl mx-auto px-6 relative z-10 text-center">
+        <div className="max-w-4xl mx-auto px-6 relative z-10 text-center">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col items-center"
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.5, type: "spring", stiffness: 200 }}
+            className="pill-badge mx-auto mb-8 bg-card border-border shadow-sm"
           >
-            {/* Badges */}
-            <div className="flex items-center gap-3 mb-10">
-              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.8)]" />
-                <span className="text-[11px] font-bold tracking-widest uppercase text-primary/80">#1 AI Codebase Engine</span>
+            <span className="px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-bold text-[10px] uppercase tracking-wider">New</span>
+            <span className="text-foreground/80">Hierarchical RAG chat with live citations</span>
+            <ChevronDown className="h-3 w-3 -rotate-90 text-muted-foreground" />
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1, type: "spring", stiffness: 100, damping: 20 }}
+            className="font-display text-5xl sm:text-6xl md:text-7xl font-bold tracking-[-0.03em] leading-[1.05] mb-6"
+          >
+            <span className="hero-gradient-text">Codebases</span> that{" "}
+            <span className="relative inline-block">
+              explain themselves
+              <motion.span
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ delay: 0.7, duration: 0.5, ease: "easeOut" }}
+                className="absolute -bottom-1 left-0 right-0 h-[3px] bg-primary rounded-full origin-left"
+              />
+            </span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed"
+          >
+            Understand, audit, document, and chat with any GitHub repository —{" "}
+            <span className="font-medium text-foreground">with real citations, not guesses.</span>
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3, type: "spring", stiffness: 100 }}
+            className="w-full max-w-xl mx-auto space-y-3"
+          >
+            <div className="flex flex-col sm:flex-row items-center gap-2 p-2 rounded-2xl soft-card focus-within:border-primary/50 transition-all">
+              <div className="flex-grow flex items-center px-3 w-full">
+                <Github className="h-4 w-4 text-muted-foreground shrink-0 mr-2.5" />
+                <input
+                  placeholder="github.com/owner/repo"
+                  value={repoUrl}
+                  onChange={(e) => setRepoUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleIndex()}
+                  className="w-full bg-transparent border-none outline-none font-mono text-sm placeholder:text-muted-foreground/50 text-foreground py-2"
+                />
               </div>
-              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-md">
-                <Github className="h-3 w-3 text-white/40" />
-                <span className="text-[11px] font-bold tracking-widest uppercase text-white/60">
-                  Trusted by {visitorCount !== null ? <CountUp end={visitorCount} /> : "0"}+ Developers
-                </span>
-              </div>
+              <Button onClick={() => handleIndex()} className="w-full sm:w-auto h-10 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shrink-0">
+                Analyze <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Button>
             </div>
 
-            <h1 className="text-5xl md:text-8xl font-serif leading-[1.05] tracking-tight mb-8">
-              The most complex codebases <br />
-              <span className="italic text-teal-500">decoded in seconds.</span>
-            </h1>
+            {!user && (
+              <div className="px-4 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+                  <span>Free tier</span>
+                  <span>{indexCount}/5 repos used</span>
+                </div>
+                <Progress value={(indexCount / 5) * 100} className="h-1" />
+              </div>
+            )}
 
-            <p className="text-lg md:text-xl text-muted-foreground font-medium italic max-w-2xl mb-12 leading-relaxed">
-              Rebuild your understanding of any software system. Ask questions, <br className="hidden md:block" />
-              track dependencies, and solve issues - directly in your browser.
-            </p>
-
-            <div className="w-full max-w-2xl mx-auto space-y-4">
-              <div className="flex flex-col sm:flex-row gap-3 p-1.5 rounded-[1.5rem] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl group focus-within:border-primary/40 transition-all">
-                <div className="flex-grow flex items-center px-4">
-                  <Github className="h-5 w-5 text-muted-foreground/40 group-focus-within:text-primary/60 transition-colors mr-3" />
+            <Collapsible open={showToken} onOpenChange={setShowToken} className="pt-1">
+              <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-primary transition-colors mx-auto">
+                <Lock className="h-3 w-3" /> Need private repo access?
+                <ChevronDown className={`h-3 w-3 transition-transform ${showToken ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="mt-3 flex flex-col gap-2.5 p-4 rounded-2xl soft-card max-w-md mx-auto">
                   <input
-                    placeholder="https://github.com/owner/repo"
-                    value={repoUrl}
-                    onChange={(e) => setRepoUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleIndex()}
-                    className="w-full bg-transparent border-none outline-none font-mono text-sm placeholder:text-muted-foreground/30 text-foreground"
+                    type="password"
+                    placeholder="GitHub Personal Access Token"
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-primary/50 transition-all"
                   />
+                  <p className="text-[11px] text-muted-foreground text-center">Token stays in your browser's local storage only.</p>
                 </div>
-                <Button onClick={() => handleIndex()} className="h-12 px-8 rounded-2xl bg-teal-500 text-black font-black uppercase tracking-widest text-[11px] hover:bg-teal-400 hover:scale-105 transition-all active:scale-95 shadow-[0_0_30px_rgba(20,184,166,0.2)] shrink-0">
-                  Index Repository <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </motion.div>
 
-              {!user && (
-                <div className="px-6 space-y-2">
-                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
-                    <span>Community Tier Access</span>
-                    <span>{indexCount}/5 Credits Used</span>
-                  </div>
-                  <Progress value={(indexCount / 5) * 100} className="h-1 bg-white/5 border border-white/5" />
-                </div>
-              )}
-
-              <Collapsible open={showToken} onOpenChange={setShowToken} className="pt-2">
-                <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground/60 hover:text-primary transition-colors mx-auto">
-                  <Lock className="h-3 w-3" /> Need private repo access?
-                  <ChevronDown className={`h-3 w-3 transition-transform ${showToken ? "rotate-180" : ""}`} />
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="mt-4 flex flex-col gap-3 p-4 rounded-3xl bg-white/[0.03] border border-white/5 max-w-lg mx-auto">
-                    <input
-                      type="password"
-                      placeholder="GitHub Personal Access Token"
-                      value={githubToken}
-                      onChange={(e) => setGithubToken(e.target.value)}
-                      className="w-full bg-background/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-mono outline-none focus:border-primary/40 transition-all"
-                    />
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 text-center"> Token stays in your localStorage, encrypted. </p>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
+          {/* Quick stat pill */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
+            className="pill-badge mx-auto mt-8 bg-transparent border-transparent text-muted-foreground"
+          >
+            <Github className="h-3.5 w-3.5" />
+            Trusted by {visitorCount !== null ? <CountUp end={visitorCount} /> : "0"}+ developers
           </motion.div>
 
           {/* User Repos list if exists */}
           {user && (
-            <div className="mt-20">
+            <div className="mt-16">
               <UserRepos onIndex={handleRepoClick} />
             </div>
           )}
 
           {/* Logo Cloud Section */}
-          <div className="mt-32 pt-16 border-t border-white/5 overflow-hidden">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/30 mb-12">Enjoyed by developers at the world's best companies:</p>
-            <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-8 opacity-20 grayscale filter brightness-200">
+          <div className="mt-24 pt-12 border-t border-border overflow-hidden">
+            <p className="text-xs font-medium text-muted-foreground mb-10">Built for engineers working with</p>
+            <div className="flex flex-wrap justify-center items-center gap-x-10 gap-y-6 opacity-40 grayscale">
               {['OpenAI', 'Google', 'Anthropic', 'NVIDIA', 'Vercel', 'GitHub', 'Meta'].map(client => (
-                <span key={client} className="text-xl md:text-2xl font-black italic tracking-tighter select-none">{client}</span>
+                <span key={client} className="font-display text-lg md:text-xl font-semibold tracking-tight select-none">{client}</span>
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Simple by Design Section */}
-      <section id="how-it-works" className="relative py-32 border-b border-white/5 overflow-hidden">
-        {/* Teal Glow */}
-        <div className="teal-glow w-[600px] h-[600px] -top-1/4 -right-1/4 opacity-10" />
+      {/* VexReview Featured Section */}
+      <section id="how-it-works" className="relative py-24 border-t border-border overflow-hidden">
+        <div className="max-w-6xl mx-auto px-6 relative z-10 mb-24">
+          <div className="soft-card-elevated p-10 md:p-16 relative overflow-hidden text-center">
+            <div className="radial-glow w-[500px] h-[500px] top-0 left-1/2 -translate-x-1/2 -translate-y-1/2" />
 
-        {/* Corner Frames */}
-        <div className="corner-frame corner-frame-tl ml-8 mt-8 opacity-50" />
-        <div className="corner-frame corner-frame-tr mr-8 mt-8 opacity-50" />
+            <div className="max-w-2xl mx-auto space-y-10 relative z-10">
+              <div className="space-y-5">
+                <span className="pill-badge mx-auto text-primary bg-primary/5 border-primary/20">
+                  <Sparkles className="h-3.5 w-3.5" /> VexReview — AI PR Reviewer
+                </span>
 
-        {/* VexReview Featured Section - Classic Redesign */}
-        <div className="max-w-7xl mx-auto px-6 relative z-10 mb-32">
-          <div className="rounded-[3rem] border border-white/5 bg-white/[0.01] backdrop-blur-3xl p-10 md:p-20 relative overflow-hidden text-center">
-            {/* Background Decorations */}
-            <div className="teal-glow w-[800px] h-[800px] -top-1/2 -left-1/2 opacity-10" />
-            <div className="teal-glow w-[600px] h-[600px] -bottom-1/2 -right-1/2 opacity-10" />
-
-            <div className="max-w-3xl mx-auto space-y-12 relative z-10">
-              <div className="space-y-6">
-                <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full border border-teal-500/20 bg-teal-500/5 backdrop-blur-xl">
-                  <Sparkles className="h-4 w-4 text-teal-500" />
-                  <span className="text-[11px] font-black tracking-[0.3em] uppercase text-teal-500">VexReview - AI PR REVIEWER</span>
-                </div>
-
-                <h2 className="text-5xl md:text-7xl font-serif leading-[1.1] tracking-tight">
-                  Next-gen reviews, <br />
-                  <span className="italic text-teal-500">for next-gen code.</span>
+                <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-[-0.02em] leading-tight">
+                  Next-gen reviews, <span className="text-primary">for next-gen code.</span>
                 </h2>
 
-                <p className="text-xl text-muted-foreground font-medium italic leading-relaxed">
-                  Powered by Open Source LLMs, VexReview automates your code review process, providing line-by-line suggestions and comprehensive summaries directly in your GitHub pull requests.
+                <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto">
+                  Powered by open-source LLMs, VexReview automates code review — line-by-line suggestions and summaries, directly in your GitHub pull requests.
                 </p>
               </div>
 
-              {/* Feature Grid */}
-              <div className="grid md:grid-cols-4 gap-8 py-12 border-y border-border/40">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-8 border-y border-border">
                 {[
-                  { title: "PR Summarization", desc: "Release notes and changes summaries.", icon: MessageSquare },
-                  { title: "Line-by-line", desc: "Detailed code change reviews.", icon: FileCode },
-                  { title: "Continuous", desc: "Incremental reviews on each commit.", icon: GitBranch },
-                  { title: "Bot Chat", desc: "Discuss changes in-thread.", icon: Brain },
+                  { title: "PR Summarization", icon: MessageSquare },
+                  { title: "Line-by-line review", icon: FileCode },
+                  { title: "Runs on each commit", icon: GitBranch },
+                  { title: "In-thread bot chat", icon: Brain },
                 ].map((feat, i) => (
-                  <div key={i} className="space-y-4 group">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto transition-all group-hover:border-teal-500/20 group-hover:bg-teal-500/5">
-                      <feat.icon className="h-5 w-5 text-muted-foreground group-hover:text-teal-500" />
+                  <div key={i} className="space-y-3 group">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto transition-all group-hover:bg-primary/15">
+                      <feat.icon className="h-4.5 w-4.5 text-primary" />
                     </div>
-                    <div className="space-y-1">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground">{feat.title}</h4>
-                      <p className="text-[10px] text-muted-foreground italic font-medium">{feat.desc}</p>
-                    </div>
+                    <p className="text-xs font-medium text-foreground">{feat.title}</p>
                   </div>
                 ))}
               </div>
 
-              {/* Installation Terminal */}
-              <div className="max-w-xl mx-auto">
-                <div className="rounded-2xl border border-border/40 bg-card/60 backdrop-blur-xl overflow-hidden text-left shadow-2xl">
-                  <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between bg-card/40">
+              <div className="max-w-lg mx-auto">
+                <div className="rounded-xl border border-border bg-code-bg overflow-hidden text-left">
+                  <div className="px-4 py-2.5 border-b border-border flex items-center justify-between">
                     <div className="flex gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/40" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500/40" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-red-500/30" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-amber-500/30" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/30" />
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">github-action.yml</span>
+                    <span className="text-[11px] font-mono text-muted-foreground">github-action.yml</span>
                   </div>
-                  <div className="p-6 font-mono text-xs leading-relaxed">
+                  <div className="p-5 font-mono text-xs leading-relaxed">
                     <div className="flex gap-4">
-                      <span className="text-muted-foreground/30 select-none">1</span>
-                      <span><span className="text-teal-500">- name:</span> VexReview - AI Reviewer</span>
+                      <span className="text-muted-foreground/40 select-none">1</span>
+                      <span><span className="text-primary">- name:</span> VexReview - AI Reviewer</span>
                     </div>
                     <div className="flex gap-4">
-                      <span className="text-muted-foreground/30 select-none">2</span>
-                      <span>&nbsp;&nbsp;<span className="text-teal-500">uses:</span> SUBHAZIT/VEXREVIEW@CODE-REVIEW</span>
+                      <span className="text-muted-foreground/40 select-none">2</span>
+                      <span>&nbsp;&nbsp;<span className="text-primary">uses:</span> SUBHAZIT/VEXREVIEW@CODE-REVIEW</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-8 pt-8">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
                 <a
                   href="https://github.com/marketplace/actions/vexreview-ai-based-pr-reviewer-summarizer"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-14 px-10 rounded-full bg-teal-500 text-black font-black uppercase tracking-widest text-xs hover:bg-teal-400 hover:scale-105 transition-all shadow-[0_0_40px_rgba(20,184,166,0.2)] flex items-center"
+                  className="h-11 px-6 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all flex items-center"
                 >
                   View on Marketplace <ArrowRight className="ml-2 h-4 w-4" />
                 </a>
-                <div className="flex items-center gap-3 px-6 py-3 rounded-full border border-white/5 bg-white/[0.02]">
-                  <div className="flex flex-col text-left">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">License</span>
-                    <span className="text-xs font-bold text-foreground">MIT OPEN SOURCE</span>
-                  </div>
-                </div>
+                <span className="text-xs font-medium text-muted-foreground">MIT Open Source</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="absolute inset-x-0 top-0 h-px bg-white/5" />
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-24">
-            <h2 className="text-4xl md:text-6xl font-serif mb-6 tracking-tight">Simple by design</h2>
-            <p className="text-muted-foreground text-lg italic font-medium">Pick a repository, index it, and start chatting. That's it.</p>
+        <div className="max-w-6xl mx-auto px-6 relative z-10">
+          <div className="text-center mb-16 space-y-3">
+            <span className="pill-badge mx-auto text-primary bg-primary/5 border-primary/20">✦ Process</span>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-[-0.02em]">Simple by design</h2>
+            <p className="text-muted-foreground text-base">Pick a repository, index it, and start chatting. That's it.</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-0 relative border border-white/5 bg-white/[0.01]">
-            {/* Background Glow */}
-            <div className="absolute bg-glow w-[500px] h-[500px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20 z-0" />
-
-            {/* Grid background lines */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="grid-line-v left-1/3 opacity-10" />
-              <div className="grid-line-v left-2/3 opacity-10" />
-            </div>
-
+          <div className="grid md:grid-cols-3 gap-4">
             {[
               {
                 id: 1,
@@ -544,7 +510,7 @@ const Landing = () => {
               {
                 id: 2,
                 title: "AI Analysis",
-                desc: "Our engine maps dependencies, generates embeddings, and understands the 'why' behind your code.",
+                desc: "The engine maps dependencies, generates embeddings, and understands the 'why' behind your code.",
                 icon: Brain
               },
               {
@@ -571,85 +537,55 @@ const Landing = () => {
                 desc: "Create comprehensive guides for any sub-module or feature instantly.",
                 icon: FileCode
               }
-            ].map((step, i) => {
-              const borderClasses = `
-                ${i % 3 !== 2 ? 'md:border-r' : ''} 
-                ${i < 3 ? 'md:border-b' : ''} 
-                border-white/5
-              `;
-
-              return (
-                <div key={i} className={`p-10 md:p-16 flex flex-col gap-8 group hover:bg-white/[0.03] transition-all relative z-10 ${borderClasses}`}>
-                  <div className="space-y-6">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground group-hover:text-teal-500 group-hover:border-teal-500/20 transition-all">
-                      <step.icon className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-serif italic tracking-tight text-white">{step.id}. {step.title}</h3>
-                      <p className="text-muted-foreground text-sm leading-relaxed italic font-medium">{step.desc}</p>
-                    </div>
+            ].map((step, i) => (
+              <div key={i} className="soft-card p-8 flex flex-col gap-6 group hover:border-primary/30 transition-all">
+                <div className="space-y-4">
+                  <div className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:border-primary/30 transition-all">
+                    <step.icon className="h-5 w-5" />
                   </div>
-                  {/* Card Mockup Visual */}
-                  <div className="mt-auto pt-8 border-t border-white/5 opacity-60 group-hover:opacity-100 transition-opacity">
-                    <div className="h-32 rounded-xl bg-gradient-to-br from-white/10 to-transparent border border-white/5 overflow-hidden p-4">
-                      <div className="w-full h-2 rounded-full bg-white/10 mb-3" />
-                      <div className="w-2/3 h-2 rounded-full bg-white/10 mb-3" />
-                      <div className="w-3/4 h-2 rounded-full bg-white/10" />
-                    </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-display text-base font-semibold tracking-tight text-foreground">{step.id}. {step.title}</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">{step.desc}</p>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Features Grid Section */}
-      <section id="features" className="relative py-32 overflow-hidden border-b border-white/5">
-        {/* Teal Glows */}
-        <div className="teal-glow w-[500px] h-[500px] top-0 left-0 -translate-x-1/2 -translate-y-1/2 opacity-15" />
-        <div className="teal-glow w-[500px] h-[500px] bottom-0 right-0 translate-x-1/2 translate-y-1/2 opacity-15" />
-
-        {/* Corner Frames */}
-        <div className="corner-frame corner-frame-tl ml-8 mt-8 opacity-40" />
-        <div className="corner-frame corner-frame-tr mr-8 mt-8 opacity-40" />
-
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-24">
-            <h2 className="text-4xl md:text-6xl font-serif mb-6 tracking-tight">Everything you need to understand code</h2>
-            <p className="text-muted-foreground text-lg italic font-medium max-w-2xl mx-auto">From onboarding to debugging to security — one tool that replaces hours of manual code reading.</p>
+      <section id="features" className="relative py-24 border-t border-border overflow-hidden">
+        <div className="max-w-6xl mx-auto px-6 relative z-10">
+          <div className="text-center mb-16 space-y-3">
+            <span className="pill-badge mx-auto text-primary bg-primary/5 border-primary/20">✦ Features</span>
+            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-[-0.02em]">Everything you need to understand code</h2>
+            <p className="text-muted-foreground text-base max-w-xl mx-auto">From onboarding to debugging to security — one tool that replaces hours of manual code reading.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-1">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((f, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="group p-10 md:p-12 flex flex-col gap-6 bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-all cursor-default relative overflow-hidden"
+                transition={{ delay: (i % 3) * 0.06 }}
+                className="soft-card group p-8 flex flex-col gap-5 hover:border-primary/30 transition-all cursor-default"
               >
-                {/* Subtle Glow on hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                <div className="relative z-10 space-y-6">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground/60 group-hover:text-teal-500 group-hover:border-teal-500/20 transition-all">
-                    <f.icon className="h-6 w-6" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-xl font-serif italic tracking-tight text-foreground">{f.title}</h3>
-                    <p className="text-muted-foreground/60 text-sm leading-relaxed italic font-medium">{f.desc}</p>
-                  </div>
+                <div className="w-11 h-11 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:border-primary/30 transition-all">
+                  <f.icon className="h-5 w-5" />
                 </div>
-
-                {/* Card highlight border bottom */}
-                <div className="absolute bottom-0 left-0 h-px w-0 bg-primary/40 group-hover:w-full transition-all duration-500" />
+                <div className="space-y-2">
+                  <h3 className="font-display text-lg font-semibold tracking-tight text-foreground">{f.title}</h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{f.desc}</p>
+                </div>
               </motion.div>
             ))}
           </div>
 
-          <div className="mt-24 text-center">
-            <Button size="lg" onClick={() => handleIndex()} className="h-14 px-10 rounded-full bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-neutral-200 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]">
+          <div className="mt-16 text-center">
+            <Button size="lg" onClick={() => handleIndex()} className="h-12 px-8 rounded-full bg-foreground text-background font-semibold text-sm hover:opacity-90 transition-all">
               Explore all features <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -657,107 +593,88 @@ const Landing = () => {
       </section>
 
       {/* Bottom CTA Section */}
-      <section className="py-48 relative overflow-hidden border-t border-white/5 bg-teal-500/[0.02]">
-        {/* Teal Glow */}
-        <div className="teal-glow w-[600px] h-[600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-25" />
-
-        {/* Corner Frames */}
-        <div className="corner-frame corner-frame-tl ml-8 mt-8 opacity-40" />
-        <div className="corner-frame corner-frame-tr mr-8 mt-8 opacity-40" />
-        <div className="corner-frame corner-frame-bl ml-8 mb-8 opacity-40" />
-        <div className="corner-frame corner-frame-br mr-8 mb-8 opacity-40" />
-
-        <div className="absolute inset-0 pointer-events-none opacity-10">
-          <div className="grid-line-v left-1/2 -translate-x-1/2" />
-          <div className="grid-line-h top-1/2 -translate-y-1/2" />
-        </div>
-
-        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="space-y-8"
-          >
-            <h2 className="text-4xl md:text-7xl font-serif italic tracking-tight">Ready to master <br /> your codebase?</h2>
-            <p className="text-muted-foreground text-lg italic font-medium max-w-lg mx-auto">Join 10,000+ developers using AI to decode complex software systems.</p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" onClick={() => handleIndex()} className="h-14 px-10 rounded-full bg-white text-black font-black uppercase tracking-widest text-xs hover:bg-neutral-200 transition-all shadow-2xl">
-                Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
+      <section className="py-24 px-6">
+        <div className="max-w-5xl mx-auto rounded-3xl bg-foreground text-background p-10 sm:p-16 relative overflow-hidden">
+          <div className="radial-glow w-[500px] h-[500px] -right-32 -bottom-32 opacity-70" />
+          <div className="relative z-10 max-w-xl space-y-6 text-center sm:text-left">
+            <h2 className="font-display text-3xl sm:text-5xl font-bold tracking-[-0.02em] leading-tight">
+              Ready to master your codebase?
+            </h2>
+            <p className="text-base opacity-70">
+              Join 10,000+ developers using AI to decode complex software systems.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-3">
+              <Button size="lg" onClick={() => handleIndex()} className="h-12 px-8 rounded-full bg-background text-foreground font-semibold text-sm hover:opacity-90 transition-all">
+                Get started free <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="lg"
                 onClick={() => navigate("/our-philosophy")}
-                className="h-14 px-10 rounded-full border border-white/10 text-white font-black uppercase tracking-widest text-[10px] hover:bg-white/5"
+                className="h-12 px-8 rounded-full border border-background/20 text-background font-semibold text-sm hover:bg-background/10"
               >
-                Our Philosophy
+                Our philosophy
               </Button>
             </div>
-          </motion.div>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 border-t border-border bg-card/30">
-        <div className="max-w-6xl mx-auto px-6 py-12">
+      <footer className="py-16 border-t border-border">
+        <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 mb-3">
-                <span className="font-mono text-sm font-bold text-foreground">GITPLUS</span>
+                <span className="font-display text-sm font-bold text-foreground">GitPlus</span>
               </div>
-              <p className="text-[10px] text-muted-foreground/60 leading-relaxed max-w-xs uppercase tracking-wider">
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
                 AI-powered codebase intelligence. Understand, debug, and secure any repository in minutes.
               </p>
             </div>
 
             {/* Product */}
             <div>
-              <p className="text-[10px] font-black text-foreground mb-4 uppercase tracking-[0.2em]">Product</p>
-              <ul className="space-y-3">
-                <li><Link to="/features" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">Features</Link></li>
-                <li><Link to="/how-it-works" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">How it works</Link></li>
-                <li><Link to="/faq" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">FAQ</Link></li>
+              <p className="text-xs font-semibold text-foreground mb-3">Product</p>
+              <ul className="space-y-2.5">
+                <li><Link to="/features" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Features</Link></li>
+                <li><Link to="/how-it-works" className="text-xs text-muted-foreground hover:text-foreground transition-colors">How it works</Link></li>
+                <li><Link to="/faq" className="text-xs text-muted-foreground hover:text-foreground transition-colors">FAQ</Link></li>
               </ul>
             </div>
 
             {/* Resources */}
             <div>
-              <p className="text-[10px] font-black text-foreground mb-4 uppercase tracking-[0.2em]">Resources</p>
-              <ul className="space-y-3">
-                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">GitHub</a></li>
-                <li><Link to="/docs" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">Documentation</Link></li>
-                <li><Link to="/changelog" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">Changelog</Link></li>
+              <p className="text-xs font-semibold text-foreground mb-3">Resources</p>
+              <ul className="space-y-2.5">
+                <li><a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground transition-colors">GitHub</a></li>
+                <li><Link to="/docs" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Documentation</Link></li>
+                <li><Link to="/changelog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Changelog</Link></li>
               </ul>
             </div>
 
             {/* Legal */}
             <div>
-              <p className="text-[10px] font-black text-foreground mb-4 uppercase tracking-[0.2em]">Legal</p>
-              <ul className="space-y-3">
-                <li><Link to="/privacy" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">Terms of Service</Link></li>
-                <li><Link to="/contact" className="text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.15em]">Contact</Link></li>
+              <p className="text-xs font-semibold text-foreground mb-3">Legal</p>
+              <ul className="space-y-2.5">
+                <li><Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link></li>
+                <li><Link to="/contact" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Contact</Link></li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-border pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-[11px] text-muted-foreground">
-              A PRODUCT OF GITPLUS
+            <p className="text-xs text-muted-foreground">
+              A product of GitPlus
             </p>
-            <p className="text-[11px] text-muted-foreground">
-              BUILT WITH ❤ FOR <span className="text-foreground">DEVELOPERS</span>
+            <p className="text-xs text-muted-foreground">
+              © 2026 GitPlus. Built for developers.
             </p>
           </div>
         </div>
       </footer>
-      <div className="w-full bg-background border-t border-border/40 py-4 px-6 flex justify-center">
-        <span className="text-[11px] font-medium text-muted-foreground tracking-wider">
-          © COPYRIGHT 2026 <span className="text-teal-500">GITPLUS</span>
-        </span>
-      </div>
     </div>
   );
 
