@@ -7,19 +7,20 @@
 import { reciprocalRankFusion as actianRRF } from "@actian/vectorai-client";
 import type { SearchHit } from "./actian.js";
 
-export interface KeywordHit {
+export interface KeywordCandidate {
   id: string;
-  score: number;
+  text: string; // the same embeddingText that was embedded (code+context or summary) — keeps sparse/dense search aligned
   payload: SearchHit["payload"];
 }
 
+export interface KeywordHit extends KeywordCandidate {
+  score: number;
+}
+
 /**
- * Keyword search (BM25-style term frequency) over chunk candidates
+ * Keyword search (BM25-style term frequency) over node candidates
  */
-export function keywordSearch(
-  query: string,
-  candidates: { id: string; payload: SearchHit["payload"] }[]
-): KeywordHit[] {
+export function keywordSearch(query: string, candidates: KeywordCandidate[]): KeywordHit[] {
   const terms = query
     .toLowerCase()
     .split(/\s+/)
@@ -28,15 +29,7 @@ export function keywordSearch(
   if (terms.length === 0) return [];
 
   const scored = candidates.map((c) => {
-    const text = [
-      c.payload.codeSnippet,
-      c.payload.filePath,
-      c.payload.category,
-      c.payload.symbolType,
-    ]
-      .join(" ")
-      .toLowerCase();
-
+    const text = c.text.toLowerCase();
     let score = 0;
     for (const term of terms) {
       const matches = (text.match(new RegExp(escapeRegex(term), "gi")) || []).length;
@@ -52,26 +45,30 @@ export function keywordSearch(
 }
 
 /**
- * Reciprocal Rank Fusion (RRF) algorithm (k=60 as recommended by Actian VectorAI docs)
+ * Reciprocal Rank Fusion (RRF) algorithm (k=60 as recommended by Actian VectorAI docs).
+ * `limit` defaults to 10 for plain search results, but retrieval.ts asks for a larger
+ * pool (e.g. 25) so MMR has real candidates to diversify against before narrowing down.
  */
 export function reciprocalRankFusion(
   vectorResults: SearchHit[],
   keywordResults: KeywordHit[],
-  k = 60
+  k = 60,
+  limit = 10
 ): SearchHit[] {
   // If @actian/vectorai-client provides RRF function, we can use it or fall back to custom RRF calculation
   try {
     if (typeof actianRRF === "function") {
       const fused = actianRRF([
-        vectorResults.map((item, rank) => ({ id: item.id, score: item.score, payload: item.payload, rank: rank + 1 })),
+        vectorResults.map((item, rank) => ({ id: item.id, score: item.score, payload: item.payload, vector: item.vector, rank: rank + 1 })),
         keywordResults.map((item, rank) => ({ id: item.id, score: item.score, payload: item.payload, rank: rank + 1 })),
       ] as any);
 
       if (Array.isArray(fused) && fused.length > 0) {
-        return fused.slice(0, 10).map((item: any) => ({
+        return fused.slice(0, limit).map((item: any) => ({
           id: String(item.id),
           score: item.score || item.rrfScore || 0,
           payload: item.payload,
+          vector: item.vector,
         }));
       }
     }
@@ -100,7 +97,7 @@ export function reciprocalRankFusion(
 
   return Array.from(scoreMap.values())
     .sort((a, b) => b.score - a.score)
-    .slice(0, 10)
+    .slice(0, limit)
     .map((e) => ({ ...e.item, score: e.score }));
 }
 

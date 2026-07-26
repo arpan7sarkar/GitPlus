@@ -122,6 +122,10 @@ export interface SearchResult {
   category: string;
   language: string;
   symbolType: string;
+  /** Which tier of the repo->module->file->symbol hierarchy this hit came from. */
+  level?: "repo" | "module" | "file" | "symbol";
+  /** The immediate parent node's summary, for small-to-big context expansion. */
+  parentContext?: { level: string; filePath: string | null; summary: string | null } | null;
 }
 
 export interface HybridSearchResponse {

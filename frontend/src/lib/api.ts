@@ -203,75 +203,93 @@ export async function generateOnboardingDoc(repoContext: string): Promise<string
 /**
  * POST /api/chat with action: "chat" — SSE streaming chat.
  * Server responds with text/event-stream.
+ *
+ * When `repoId` is passed, the server runs real per-turn RAG: it retrieves
+ * chunks relevant to the latest message fresh on every call (dense + sparse
+ * fusion, MMR-diversified, parent-expanded) instead of reusing a single static
+ * `repoContext` blob for the whole conversation. `repoContext` is still sent
+ * as a fallback for repos that haven't been indexed into the search DB yet.
  */
 export async function streamChat(params: {
   messages: Array<{ role: string; content: string }>;
   repoContext?: string;
-  onChunk?: (chunk: string) => void;
+  repoId?: string;
+  onDelta?: (chunk: string) => void;
+  onDone?: () => void;
+  onError?: (error: string) => void;
 }) {
-  const res = await fetch(`${BASE}/chat`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: params.messages,
-      repoContext: params.repoContext || "",
-      action: "chat",
-    }),
-  });
+  const processChunk = (json: any) => {
+    const content = json.choices?.[0]?.delta?.content;
+    if (content) params.onDelta?.(content);
+  };
 
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(errBody.error || "Chat request failed");
-  }
+  try {
+    const res = await fetch(`${BASE}/chat`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: params.messages,
+        repoContext: params.repoContext || "",
+        repoId: params.repoId,
+        action: "chat",
+      }),
+    });
 
-  const reader = res.body?.getReader();
-  if (!reader) return;
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(errBody.error || "Chat request failed");
+    }
 
-  const decoder = new TextDecoder();
-  let buffer = "";
+    const reader = res.body?.getReader();
+    if (!reader) {
+      params.onDone?.();
+      return;
+    }
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    buffer += decoder.decode(value, { stream: true });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    // Parse SSE lines: "data: {...}\n\n"
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || ""; // Keep incomplete last line in buffer
+      buffer += decoder.decode(value, { stream: true });
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed === "data: [DONE]") continue;
+      // Parse SSE lines: "data: {...}\n\n"
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || ""; // Keep incomplete last line in buffer
 
-      if (trimmed.startsWith("data: ")) {
-        try {
-          const json = JSON.parse(trimmed.slice(6));
-          const content = json.choices?.[0]?.delta?.content;
-          if (content) {
-            params.onChunk?.(content);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === "data: [DONE]") continue;
+
+        if (trimmed.startsWith("data: ")) {
+          try {
+            processChunk(JSON.parse(trimmed.slice(6)));
+          } catch {
+            // Not valid JSON SSE — might be raw text stream, pass through
+            params.onDelta?.(trimmed.slice(6));
           }
-        } catch {
-          // Not valid JSON SSE — might be raw text stream, pass through
-          params.onChunk?.(trimmed.slice(6));
         }
       }
     }
-  }
 
-  // Flush remaining buffer
-  if (buffer.trim() && buffer.trim() !== "data: [DONE]") {
-    const trimmed = buffer.trim();
-    if (trimmed.startsWith("data: ")) {
-      try {
-        const json = JSON.parse(trimmed.slice(6));
-        const content = json.choices?.[0]?.delta?.content;
-        if (content) params.onChunk?.(content);
-      } catch {
-        // pass
+    // Flush remaining buffer
+    if (buffer.trim() && buffer.trim() !== "data: [DONE]") {
+      const trimmed = buffer.trim();
+      if (trimmed.startsWith("data: ")) {
+        try {
+          processChunk(JSON.parse(trimmed.slice(6)));
+        } catch {
+          // pass
+        }
       }
     }
+
+    params.onDone?.();
+  } catch (e) {
+    params.onError?.(e instanceof Error ? e.message : "Chat request failed");
   }
 }
 
@@ -402,11 +420,12 @@ export async function fetchFileBatch(params: {
  */
 export async function ingestCodeChunks(
   repoId: string,
-  files: { path: string; content: string }[]
+  files: { path: string; content: string }[],
+  repoMeta?: { name?: string; description?: string; language?: string }
 ): Promise<IngestResponse> {
   return apiRequest<IngestResponse>("/search/ingest", {
     method: "POST",
-    body: JSON.stringify({ repoId, files }),
+    body: JSON.stringify({ repoId, files, repoMeta }),
   });
 }
 
