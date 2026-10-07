@@ -4,11 +4,11 @@
  * native `dimensions` param — large-model retrieval quality at roughly the storage/
  * cost of a mid-size model (full text-embedding-3-large is 3072 dims).
  *
- * Unlike summarize.ts, there's no fallback provider here — Actian's vector space
+ * Unlike summarize.ts, there's no fallback provider here — Pinecone's vector space
  * has to stay consistent, so a transient network blip (ECONNRESET etc., which
  * does happen against OpenAI) gets retried with backoff instead of failing the
  * whole ingest outright. A single uncaught throw here used to abort everything
- * downstream (Actian upsert, Postgres mirror, the IndexedRepo association) with
+ * downstream (Pinecone upsert, Postgres mirror, the IndexedRepo association) with
  * no partial-failure recovery.
  */
 

@@ -12,7 +12,7 @@ interface HealthState {
     ai: boolean;
     network: boolean;
     postgres: boolean;
-    vectorai: boolean;
+    pinecone: boolean;
   };
   checkHealth: () => Promise<void>;
 }
@@ -21,14 +21,14 @@ export const useHealthStore = create<HealthState>((set) => ({
   status: 'operational',
   latency: 45,
   lastChecked: new Date().toISOString(),
-  checks: { github: true, ai: true, network: true, postgres: false, vectorai: false },
+  checks: { github: true, ai: true, network: true, postgres: false, pinecone: false },
   
   checkHealth: async () => {
     const start = performance.now();
     let isGithubUp = true;
     let isNetworkUp = navigator.onLine;
     let isPostgresUp = false;
-    let isVectoraiUp = false;
+    let isPineconeUp = false;
 
     // 1. Check GitHub API reachability
     try {
@@ -42,10 +42,10 @@ export const useHealthStore = create<HealthState>((set) => ({
     try {
       const health = await checkHealth();
       isPostgresUp = health.postgres === 'connected';
-      isVectoraiUp = health.vectorai === 'connected';
+      isPineconeUp = health.pinecone === 'connected';
     } catch {
       isPostgresUp = false;
-      isVectoraiUp = false;
+      isPineconeUp = false;
     }
 
     const end = performance.now();
@@ -54,7 +54,7 @@ export const useHealthStore = create<HealthState>((set) => ({
     let newStatus: HealthStatus = 'operational';
     if (!isNetworkUp || !isGithubUp) {
       newStatus = 'outage';
-    } else if (!isPostgresUp || !isVectoraiUp || duration > 500) {
+    } else if (!isPostgresUp || !isPineconeUp || duration > 500) {
       newStatus = 'degraded';
     }
 
@@ -67,7 +67,7 @@ export const useHealthStore = create<HealthState>((set) => ({
         ai: true, // Multi-provider AI (Gemini + OpenAI) — always true if network is up
         network: isNetworkUp,
         postgres: isPostgresUp,
-        vectorai: isVectoraiUp,
+        pinecone: isPineconeUp,
       }
     });
   }

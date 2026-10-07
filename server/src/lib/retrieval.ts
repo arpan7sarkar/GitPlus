@@ -5,7 +5,7 @@
  * runs fresh on every call — real per-turn RAG, not a static context blob decided
  * once at index time.
  *
- * Pipeline: dense (Actian) + sparse (Postgres keyword) -> RRF fusion over a wide
+ * Pipeline: dense (Pinecone) + sparse (Postgres keyword) -> RRF fusion over a wide
  * candidate pool -> MMR (Max Marginal Relevance) re-ranking down to the final set,
  * so the LLM gets diverse, non-redundant chunks instead of several near-duplicate
  * hits from the same file crowding out everything else -> parent-context expansion
@@ -13,7 +13,7 @@
  */
 
 import { prisma } from "./prisma.js";
-import { vectorSearch, type SearchHit, type NodeLevel } from "./actian.js";
+import { vectorSearch, type SearchHit, type NodeLevel } from "./pinecone.js";
 import { generateEmbedding } from "./embeddings.js";
 import { keywordSearch, reciprocalRankFusion } from "./hybridSearch.js";
 
@@ -110,10 +110,10 @@ export async function retrieveForQuery(
 
   const queryVector = await generateEmbedding(query);
 
-  const actianFilter: Record<string, string> = { repoId };
-  if (opts?.level) actianFilter.level = opts.level;
-  if (opts?.category) actianFilter.category = opts.category;
-  if (opts?.language) actianFilter.language = opts.language;
+  const pineconeFilter: Record<string, string> = { repoId };
+  if (opts?.level) pineconeFilter.level = opts.level;
+  if (opts?.category) pineconeFilter.category = opts.category;
+  if (opts?.language) pineconeFilter.language = opts.language;
 
   const dbWhere = {
     repoId,
@@ -123,7 +123,7 @@ export async function retrieveForQuery(
   };
 
   const [denseResults, dbNodes] = await Promise.all([
-    vectorSearch(queryVector, actianFilter, FETCH_K, true),
+    vectorSearch(queryVector, pineconeFilter, FETCH_K, true),
     prisma.node.findMany({
       where: dbWhere,
       select: {
