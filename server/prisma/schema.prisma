@@ -154,8 +154,8 @@ model Visit {
 
 // ─── Nodes (Hierarchical Vector Search Metadata Mirror) ─────────────────────────
 // One unified table for all 4 tiers of the retrieval hierarchy: repo -> module ->
-// file -> symbol. Mirrors what's embedded and stored in Actian VectorAI, plus the
-// "huge context" fields (full file content, LLM summaries) Actian doesn't need to
+// file -> symbol. Mirrors what's embedded and stored in Pinecone, plus the
+// "huge context" fields (full file content, LLM summaries) Pinecone doesn't need to
 // hold — this table is what keyword search runs against and what retrieval walks
 // up `parentId` to expand a small symbol hit into its surrounding file/module/repo
 // context before handing it to the LLM.
