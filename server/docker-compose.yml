@@ -1,6 +1,7 @@
 version: "3.9"
 services:
   actian-vectorai:
+    profiles: ["legacy-actian"]
     image: actian/vectorai:latest
     container_name: gitplus-vectorai
     ports:

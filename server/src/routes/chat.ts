@@ -3,7 +3,7 @@
  * Replaces: supabase/functions/chat/index.ts
  *
  * Provider failover chain:
- *   1. Google Gemini 2.0 Flash (primary)
+ *   1. Google Gemini (primary, configurable)
  *   2. OpenAI GPT-4o-mini (fallback)
  *
  * Supported action modes on POST /api/chat:
@@ -30,7 +30,7 @@ const PROVIDERS: ProviderConfig[] = [
   {
     name: "gemini",
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    model: "gemini-2.0-flash",
+    model: process.env.GOOGLE_GEMINI_MODEL?.trim() || "gemini-2.5-flash",
     getKey: () => process.env.GOOGLE_GEMINI_API_KEY,
   },
   {

@@ -1,22 +1,22 @@
 /**
  * Route: /api/search
- * Feature: Hierarchical Semantic Code Search (Actian VectorAI + Neon Postgres BM25 Keyword Search with RRF)
+ * Feature: Hierarchical Semantic Code Search (Pinecone + Neon Postgres BM25 Keyword Search with RRF)
  *
  * Ingest builds a 4-tier hierarchy per repo — repo -> module -> file -> symbol —
- * and embeds every tier (text-embedding-3-large @ 1024 dims) into one Actian
- * collection with `level` as a filterable payload field. Hybrid search fuses
- * Actian's dense results with Postgres sparse keyword results, then expands each
+ * and embeds every tier (text-embedding-3-large @ 1024 dims) into one Pinecone
+ * index with `level` as a filterable metadata field. Hybrid search fuses
+ * Pinecone's dense results with Postgres sparse keyword results, then expands each
  * hit with its immediate parent's summary for extra context.
  *
  * Endpoints:
- *   - POST /api/search/ingest - Chunks, summarizes, embeds & indexes a repo into Actian & Postgres
+ *   - POST /api/search/ingest - Chunks, summarizes, embeds & indexes a repo into Pinecone & Postgres
  *   - POST /api/search/hybrid - Performs hybrid RRF search combining dense vector search & sparse term matching
  */
 
 import path from "path";
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
-import { upsertChunks, deleteByRepo, type NodeLevel, type NodePayload } from "../lib/actian.js";
+import { ensureIndex, upsertChunks, deleteByRepo, type NodeLevel, type NodePayload } from "../lib/pinecone.js";
 import { generateEmbeddingsBatch } from "../lib/embeddings.js";
 import { chunkCodeFiles, detectCategory, hash, type FileNode, type SymbolChunk } from "../lib/chunker.js";
 import { summarizeFile, summarizeModule, summarizeRepo, mapWithConcurrency } from "../lib/summarize.js";
@@ -83,11 +83,9 @@ router.post("/ingest", async (req: Request, res: Response) => {
 
     console.log(`[search-ingest] Ingesting ${files.length} files for repoId: ${repoId}`);
 
-    // 1. Wipe previous data for this repoId (idempotent re-index)
-    await deleteByRepo(repoId);
-    await prisma.node.deleteMany({ where: { repoId } });
+    await ensureIndex();
 
-    // 2. Symbol-aware chunking (AST where supported, boundary-snapped fallback otherwise)
+    // Symbol-aware chunking (AST where supported, boundary-snapped fallback otherwise)
     const { fileNodes, symbolChunks } = await chunkCodeFiles(files, repoId);
     if (fileNodes.length === 0) {
       return res.json({ success: true, count: 0 });
@@ -229,7 +227,10 @@ router.post("/ingest", async (req: Request, res: Response) => {
     // 7. Embed every tier in one batch pass (text-embedding-3-large @ 1024 dims)
     const embeddings = await generateEmbeddingsBatch(nodes.map((n) => n.embeddingText));
 
-    // 8. Upsert into Actian VectorAI (single collection, `level` filterable in payload)
+    // Keep the old index intact until summaries and embeddings have succeeded.
+    await deleteByRepo(repoId);
+    await prisma.node.deleteMany({ where: { repoId } });
+
     await upsertChunks(
       nodes.map((n, i) => ({
         id: n.id,
@@ -249,7 +250,7 @@ router.post("/ingest", async (req: Request, res: Response) => {
     // 10. If the requester is logged in, record this repo against their account
     // (powers the "My Repos" page — the Node hierarchy above has no userId,
     // it's keyed only by repoId, so this is the only user<->repo association).
-    // Non-fatal: the expensive work above (embeddings, Actian, Postgres nodes)
+    // Non-fatal: the expensive work above (embeddings, Pinecone, Postgres nodes)
     // already succeeded by this point, so a failure here shouldn't turn the
     // whole ingest into an error — it would just mean re-indexing is needed to
     // pick the repo up in the list.
@@ -303,7 +304,7 @@ router.post("/hybrid", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "query and repoId string parameters are required" });
     }
 
-    // Dense (Actian) + sparse (Postgres) fusion, MMR-diversified, parent-expanded —
+    // Dense (Pinecone) + sparse (Postgres) fusion, MMR-diversified, parent-expanded —
     // same retrieval pipeline /api/chat uses internally for RAG.
     const { chunks } = await retrieveForQuery(query, repoId, {
       level: filter?.level,
