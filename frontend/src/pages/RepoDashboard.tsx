@@ -105,7 +105,7 @@ const RepoDashboard = () => {
         // Cache for future visits
         safeSetRepoCache(`repo_data_${repoId}`, repoData);
 
-        // Ingest code chunks to Actian VectorAI for hybrid search (background)
+        // Ingest code chunks to Pinecone for hybrid search (background)
         ingestCodeChunks(
           data.repoId,
           data.fileContents.map((f: any) => ({ path: f.path, content: f.content })),

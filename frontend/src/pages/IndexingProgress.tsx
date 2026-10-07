@@ -136,7 +136,7 @@ const IndexingProgress = () => {
 
         setCurrentStage(4);
 
-        // Fire off code chunk ingestion to Actian VectorAI + Prisma (background)
+        // Fire off code chunk ingestion to Pinecone + Prisma (background)
         // This populates the search index for hybrid RAG in AI chat
         ingestCodeChunks(
           data.repoId,
