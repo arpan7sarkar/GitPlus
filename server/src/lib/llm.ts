@@ -9,6 +9,8 @@
  * shape — same approach chat.ts uses for streaming.
  */
 
+import { getGeminiChatModel, getOpenAIChatModel } from "./models.js";
+
 interface ProviderConfig {
   name: string;
   url: string;
@@ -16,20 +18,22 @@ interface ProviderConfig {
   getKey: () => string | undefined;
 }
 
-const PROVIDERS: ProviderConfig[] = [
-  {
-    name: "gemini",
-    url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    model: process.env.GOOGLE_GEMINI_MODEL?.trim() || "gemini-2.5-flash",
-    getKey: () => process.env.GOOGLE_GEMINI_API_KEY,
-  },
-  {
-    name: "openai",
-    url: "https://api.openai.com/v1/chat/completions",
-    model: "gpt-4o-mini",
-    getKey: () => process.env.OPENAI_API_KEY,
-  },
-];
+function getProviders(): ProviderConfig[] {
+  return [
+    {
+      name: "gemini",
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      model: getGeminiChatModel(),
+      getKey: () => process.env.GOOGLE_GEMINI_API_KEY,
+    },
+    {
+      name: "openai",
+      url: "https://api.openai.com/v1/chat/completions",
+      model: getOpenAIChatModel(),
+      getKey: () => process.env.OPENAI_API_KEY,
+    },
+  ];
+}
 
 const COOLDOWN_MS = 60_000;
 const rateLimitState: Record<string, number> = {};
@@ -58,7 +62,7 @@ export interface CompleteOptions {
  */
 export async function completeText(opts: CompleteOptions): Promise<string> {
   const { systemPrompt, userContent, maxTokens, temperature, label = "llm" } = opts;
-  const providers = PROVIDERS.filter(isProviderAvailable);
+  const providers = getProviders().filter(isProviderAvailable);
 
   for (const provider of providers) {
     try {

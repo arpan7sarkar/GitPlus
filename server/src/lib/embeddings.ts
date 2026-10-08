@@ -1,9 +1,5 @@
 /**
  * Embeddings Helper
- * Wraps OpenAI text-embedding-3-large, truncated to 1024 dimensions via OpenAI's
- * native `dimensions` param — large-model retrieval quality at roughly the storage/
- * cost of a mid-size model (full text-embedding-3-large is 3072 dims).
- *
  * Unlike summarize.ts, there's no fallback provider here — Pinecone's vector space
  * has to stay consistent, so a transient network blip (ECONNRESET etc., which
  * does happen against OpenAI) gets retried with backoff instead of failing the
@@ -13,13 +9,49 @@
  */
 
 import OpenAI from "openai";
+import {
+  getEmbeddingDimensions,
+  getEmbeddingProvider,
+  getGeminiEmbeddingModel,
+  getOpenAIEmbeddingModel,
+} from "./models.js";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL?.trim() || "text-embedding-3-large";
+export const EMBEDDING_DIMENSIONS = getEmbeddingDimensions();
 
-export const EMBEDDING_MODEL = "text-embedding-3-large";
-export const EMBEDDING_DIMENSIONS = 1024;
+let openaiClient: OpenAI | undefined;
+let geminiClient: OpenAI | undefined;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
+
+function getGeminiClient(): OpenAI {
+  if (!geminiClient) {
+    geminiClient = new OpenAI({
+      apiKey: process.env.GOOGLE_GEMINI_API_KEY,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+    });
+  }
+  return geminiClient;
+}
+
+function requireKey(provider: "openai" | "gemini"): void {
+  if (provider === "openai" && !process.env.OPENAI_API_KEY?.trim()) {
+    throw new Error(
+      "[embeddings] OPENAI_API_KEY is missing and EMBEDDING_PROVIDER=openai was forced. " +
+        "Set OPENAI_API_KEY or use EMBEDDING_PROVIDER=gemini with GOOGLE_GEMINI_API_KEY."
+    );
+  }
+  if (provider === "gemini" && !process.env.GOOGLE_GEMINI_API_KEY?.trim()) {
+    throw new Error(
+      "[embeddings] No embedding key available. Set OPENAI_API_KEY or GOOGLE_GEMINI_API_KEY."
+    );
+  }
+}
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
@@ -51,14 +83,33 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
  * Generate a single embedding vector (used for query-time search)
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const provider = getEmbeddingProvider();
+  requireKey(provider);
+  const dimensions = getEmbeddingDimensions();
+
+  if (provider === "gemini") {
+    const model = getGeminiEmbeddingModel();
+    const response = await withRetry(
+      () =>
+        getGeminiClient().embeddings.create({
+          model,
+          dimensions,
+          input: text.slice(0, 8000),
+        } as any),
+      "generateEmbedding(gemini)"
+    );
+    return response.data[0].embedding;
+  }
+
+  const model = getOpenAIEmbeddingModel();
   const response = await withRetry(
     () =>
-      openai.embeddings.create({
-        model: EMBEDDING_MODEL,
-        dimensions: EMBEDDING_DIMENSIONS,
+      getOpenAIClient().embeddings.create({
+        model,
+        dimensions,
         input: text.slice(0, 8000),
       }),
-    "generateEmbedding"
+    "generateEmbedding(openai)"
   );
   return response.data[0].embedding;
 }
@@ -69,21 +120,39 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 export async function generateEmbeddingsBatch(
   texts: string[]
 ): Promise<number[][]> {
+  const provider = getEmbeddingProvider();
+  requireKey(provider);
+  const dimensions = getEmbeddingDimensions();
   const BATCH_SIZE = 100;
   const results: number[][] = [];
 
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE).map((t) => t.slice(0, 8000));
-    const response = await withRetry(
-      () =>
-        openai.embeddings.create({
-          model: EMBEDDING_MODEL,
-          dimensions: EMBEDDING_DIMENSIONS,
-          input: batch,
-        }),
-      `generateEmbeddingsBatch[${i}-${i + batch.length}]`
-    );
-    results.push(...response.data.map((d) => d.embedding));
+    if (provider === "gemini") {
+      const model = getGeminiEmbeddingModel();
+      const response = await withRetry(
+        () =>
+          getGeminiClient().embeddings.create({
+            model,
+            dimensions,
+            input: batch,
+          } as any),
+        `generateEmbeddingsBatch(gemini)[${i}-${i + batch.length}]`
+      );
+      results.push(...response.data.map((d) => d.embedding));
+    } else {
+      const model = getOpenAIEmbeddingModel();
+      const response = await withRetry(
+        () =>
+          getOpenAIClient().embeddings.create({
+            model,
+            dimensions,
+            input: batch,
+          }),
+        `generateEmbeddingsBatch(openai)[${i}-${i + batch.length}]`
+      );
+      results.push(...response.data.map((d) => d.embedding));
+    }
   }
 
   return results;
