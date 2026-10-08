@@ -1,25 +1,34 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronLeft, Terminal, Download, Copy, Check, Loader2, FileText, Zap } from "lucide-react";
+import { Download, Copy, Check, Loader2, FileText, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useRepoStore } from "@/lib/store";
 import { generateOnboardingDoc } from "@/lib/api";
-import { DEMO_REPOS } from "@/lib/mock-data";
+import WorkspaceNav from "@/components/layout/WorkspaceNav";
+import NoRepoLoaded from "@/components/layout/NoRepoLoaded";
 import { toast } from "@/hooks/use-toast";
 
 const OnboardingDoc = () => {
   const { repoId } = useParams();
-  const navigate = useNavigate();
   const { meta, repoContext } = useRepoStore();
-  const repo = meta || DEMO_REPOS.find((r) => r.id === repoId) || DEMO_REPOS[0];
+  const repo = meta;
 
   const [markdown, setMarkdown] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  if (!repo) {
+    return (
+      <div className="min-h-screen bg-background">
+        <WorkspaceNav repoId={repoId ?? ""} active="onboarding" />
+        <NoRepoLoaded repoId={repoId} />
+      </div>
+    );
+  }
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -56,32 +65,26 @@ const OnboardingDoc = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <nav className="sticky top-0 z-50 bg-glass border-b border-border/50">
-        <div className="container mx-auto flex items-center justify-between h-12 px-6">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(`/repo/${repoId}`)} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <Terminal className="h-4 w-4 text-primary" />
-            <span className="font-mono text-sm text-muted-foreground">
-              {repo.owner}/<span className="text-foreground font-semibold">{repo.name}</span>
-              <span className="text-muted-foreground"> · Onboarding Guide</span>
-            </span>
-          </div>
-          {markdown && (
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={handleCopy} className="font-mono text-xs">
-                {copied ? <Check className="h-3.5 w-3.5 mr-1" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+      <WorkspaceNav
+        repoId={repoId ?? ""}
+        owner={repo.owner}
+        name={repo.name}
+        active="onboarding"
+        actions={
+          markdown ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={handleCopy} className="h-7 text-xs" aria-label="Copy guide to clipboard">
+                {copied ? <Check className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5 mr-1" aria-hidden="true" />}
                 {copied ? "Copied" : "Copy"}
               </Button>
-              <Button size="sm" onClick={handleDownload} className="bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-xs">
-                <Download className="h-3.5 w-3.5 mr-1" />
-                Download .md
+              <Button size="sm" onClick={handleDownload} className="h-7 text-xs rounded-full" aria-label="Download guide as markdown">
+                <Download className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+                .md
               </Button>
-            </div>
-          )}
-        </div>
-      </nav>
+            </>
+          ) : undefined
+        }
+      />
 
       <div className="container mx-auto px-6 py-8 max-w-3xl">
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>

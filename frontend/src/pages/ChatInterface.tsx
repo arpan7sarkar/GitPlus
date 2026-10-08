@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Send, ChevronLeft, PanelRightOpen, PanelRightClose, Share2, Check, History, Plus, Trash2, Code2 } from "lucide-react";
+import { useParams, useLocation } from "react-router-dom";
+import { Send, PanelRightOpen, PanelRightClose, Share2, Check, History, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import FileTree from "@/components/chat/FileTree";
 import ChatMessageComponent from "@/components/chat/ChatMessage";
 import FileViewer from "@/components/chat/FileViewer";
-import { DEMO_REPOS, DEMO_FILE_TREE, type ChatMessage, type Citation } from "@/lib/mock-data";
+import { type ChatMessage, type Citation } from "@/lib/mock-data";
+import WorkspaceNav from "@/components/layout/WorkspaceNav";
+import NoRepoLoaded from "@/components/layout/NoRepoLoaded";
 import { useRepoStore } from "@/lib/store";
 import { streamChat } from "@/lib/api";
 import { createChatSession, updateSessionMessages, loadChatSession } from "@/lib/chat-session";
@@ -15,18 +17,16 @@ import { getChatHistory, saveChatHistoryEntry, removeChatHistoryEntry, type Chat
 import { toast } from "@/hooks/use-toast";
 import { useCompactMode } from "@/hooks/use-compact-mode";
 import { useSettingsStore } from "@/lib/settings-store";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const ChatInterface = () => {
   const { repoId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const compact = useCompactMode();
   const { settings } = useSettingsStore();
   const { meta: storeMeta, fileTree: storeFileTree, repoContext, githubToken, indexMode: storeIndexMode, unfetchedFiles: storeUnfetchedFiles } = useRepoStore();
 
-  const repo = storeMeta || DEMO_REPOS.find((r) => r.id === repoId) || DEMO_REPOS[0];
-  const fileTree = storeFileTree.length > 0 ? storeFileTree : DEMO_FILE_TREE;
+  const repo = storeMeta;
+  const fileTree = storeFileTree;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -46,7 +46,7 @@ const ChatInterface = () => {
 
   useEffect(() => {
     const state = location.state as { initialQuestion?: string } | null;
-    if (state?.initialQuestion) {
+    if (state?.initialQuestion && storeMeta) {
       handleSend(state.initialQuestion);
       window.history.replaceState({}, document.title);
     }
@@ -58,8 +58,8 @@ const ChatInterface = () => {
   }, [messages]);
 
   const persistToHistory = useCallback(async (msgs: ChatMessage[], sid: string) => {
-    if (!settings.autoSaveChatHistory) return;
-    
+    if (!settings.autoSaveChatHistory || !repo) return;
+
     const lastMsg = msgs.filter((m) => m.role === "assistant").pop();
     saveChatHistoryEntry({
       sessionId: sid,
@@ -75,6 +75,7 @@ const ChatInterface = () => {
 
   const ensureSession = async (): Promise<string> => {
     if (sessionId) return sessionId;
+    if (!repo) throw new Error("No repository loaded");
     if (!settings.autoSaveChatHistory) return "local-session-" + Date.now();
 
     const sid = await createChatSession(
@@ -87,7 +88,7 @@ const ChatInterface = () => {
 
   const handleSend = async (text?: string) => {
     const content = text || inputValue.trim();
-    if (!content || isStreaming) return;
+    if (!content || isStreaming || !repo) return;
 
     const userMsg: ChatMessage = { id: Date.now().toString(), role: "user", content, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
@@ -205,45 +206,51 @@ const ChatInterface = () => {
     setChatHistory(getChatHistory().filter((h) => h.repoId === repoId));
   };
 
+  if (!repo) {
+    return (
+      <div className="h-screen flex flex-col bg-background">
+        <WorkspaceNav repoId={repoId ?? ""} active="chat" sticky={false} />
+        <div className="flex-1">
+          <NoRepoLoaded repoId={repoId} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-background">
-      <nav className="shrink-0 flex items-center justify-between h-10 px-3 border-b border-border bg-background">
-        <div className="flex items-center gap-2">
-          {!compact && (
-            <button onClick={() => navigate(`/repo/${repoId}`)} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <Code2 className="h-3.5 w-3.5 text-primary" />
-          <span className="text-[11px] text-muted-foreground">
-            {repo.owner}/<span className="text-foreground font-medium">{repo.name}</span>
-          </span>
-          {storeIndexMode === "on-demand" && (
-            <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[8px] text-amber-500 font-bold uppercase tracking-wider">ON-DEMAND</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <ThemeToggle className="h-6 w-6 border-none" />
-          <Button variant="ghost" size="sm" onClick={startNewChat} className="h-6 px-2 text-[11px] text-muted-foreground gap-1">
-            <Plus className="h-3 w-3" /> New
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)}
-            className={`h-6 px-2 text-[11px] gap-1 ${showHistory ? "text-primary" : "text-muted-foreground"}`}>
-            <History className="h-3 w-3" /> History
-          </Button>
-          {messages.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleShare} className="h-6 px-2 text-[11px] text-muted-foreground gap-1">
-              {copied ? <Check className="h-3 w-3 text-success" /> : <Share2 className="h-3 w-3" />}
-              {copied ? "Copied" : "Share"}
+      <WorkspaceNav
+        repoId={repoId ?? ""}
+        owner={repo.owner}
+        name={repo.name}
+        active="chat"
+        sticky={false}
+        badge={storeIndexMode === "on-demand" && (
+          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[8px] text-amber-500 font-bold uppercase tracking-wider">ON-DEMAND</span>
+        )}
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={startNewChat} className="h-6 px-2 text-[11px] text-muted-foreground gap-1" aria-label="Start new chat">
+              <Plus className="h-3 w-3" aria-hidden="true" /> New
             </Button>
-          )}
-          {!compact && (
-            <Button variant="ghost" size="sm" onClick={() => setShowFileTree(!showFileTree)} className="h-6 w-6 p-0 text-muted-foreground">
-              {showFileTree ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)}
+              className={`h-6 px-2 text-[11px] gap-1 ${showHistory ? "text-primary" : "text-muted-foreground"}`} aria-label="Toggle chat history">
+              <History className="h-3 w-3" aria-hidden="true" /> History
             </Button>
-          )}
-        </div>
-      </nav>
+            {messages.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={handleShare} className="h-6 px-2 text-[11px] text-muted-foreground gap-1" aria-label="Copy share link">
+                {copied ? <Check className="h-3 w-3 text-success" /> : <Share2 className="h-3 w-3" />}
+                {copied ? "Copied" : "Share"}
+              </Button>
+            )}
+            {!compact && (
+              <Button variant="ghost" size="sm" onClick={() => setShowFileTree(!showFileTree)} className="h-6 w-6 p-0 text-muted-foreground" aria-label="Toggle file tree">
+                {showFileTree ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       <div className="flex-1 flex min-h-0">
         <AnimatePresence>
@@ -287,8 +294,13 @@ const ChatInterface = () => {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
-              <div className="text-center pt-16">
-                <p className="text-sm text-muted-foreground">Ask anything about this codebase</p>
+              <div className="text-center pt-16 px-6">
+                <p className="text-sm text-foreground font-medium mb-1">
+                  Ask anything about {repo.owner}/{repo.name}
+                </p>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                  Answers are retrieved from the indexed code and cite file paths with line numbers — verify them in the file viewer.
+                </p>
               </div>
             )}
             {messages.map((msg) => (

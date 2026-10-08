@@ -2,18 +2,18 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronLeft, Code2, MessageSquare, CircleDot, Clock,
+  MessageSquare, CircleDot, Clock,
   ExternalLink, Loader2, AlertCircle, Sparkles, X, FileDiff, CheckCircle2, Power, ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Markdown from "@/components/ui/markdown";
 import { useRepoStore } from "@/lib/store";
-import { DEMO_REPOS } from "@/lib/mock-data";
+import WorkspaceNav from "@/components/layout/WorkspaceNav";
+import NoRepoLoaded from "@/components/layout/NoRepoLoaded";
 import {
   fetchPullRequests, type GitHubPullRequest,
   fetchVexReviewStatus, enableVexReview, disableVexReview, triggerVexReview, fetchVexReviewRun, type VexReviewRun,
 } from "@/lib/api";
-import { useCompactMode } from "@/hooks/use-compact-mode";
 import { toast } from "@/hooks/use-toast";
 
 const POLL_INTERVAL_MS = 2000;
@@ -21,9 +21,8 @@ const POLL_INTERVAL_MS = 2000;
 const RepoPRs = () => {
   const { repoId } = useParams();
   const navigate = useNavigate();
-  const compact = useCompactMode();
   const { meta: storeMeta, githubToken } = useRepoStore();
-  const repo = storeMeta || DEMO_REPOS.find((r) => r.id === repoId) || DEMO_REPOS[0];
+  const repo = storeMeta;
 
   const [pulls, setPulls] = useState<GitHubPullRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,10 +38,12 @@ const RepoPRs = () => {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    loadPullRequests();
-  }, [filter]);
+    if (repo) loadPullRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, repo]);
 
   useEffect(() => {
+    if (!repo) return;
     fetchVexReviewStatus(repo.owner, repo.name)
       .then((res) => setVexEnabled(res.enabled))
       .catch((e) => console.error("[vexreview] status check failed:", e))
@@ -51,9 +52,10 @@ const RepoPRs = () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repo.owner, repo.name]);
+  }, [repo]);
 
   async function loadPullRequests() {
+    if (!repo) return;
     setLoading(true);
     setError(null);
     try {
@@ -64,6 +66,15 @@ const RepoPRs = () => {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!repo) {
+    return (
+      <div className="min-h-screen bg-background">
+        <WorkspaceNav repoId={repoId ?? ""} active="prs" />
+        <NoRepoLoaded repoId={repoId} />
+      </div>
+    );
   }
 
   async function handleToggleVexReview() {
@@ -152,24 +163,17 @@ const RepoPRs = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between h-11 px-6">
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate(`/repo/${repoId}`)} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <Code2 className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs text-muted-foreground">
-              {repo.owner}/<span className="text-foreground font-medium">{repo.name}</span>
-              <span className="text-muted-foreground ml-1">/ pull requests</span>
-            </span>
-          </div>
-          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-7 px-3 text-[11px]">
-            <MessageSquare className="h-3 w-3 mr-1" /> Chat
+      <WorkspaceNav
+        repoId={repoId ?? ""}
+        owner={repo.owner}
+        name={repo.name}
+        active="prs"
+        actions={
+          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-7 px-3 text-xs rounded-full">
+            <MessageSquare className="h-3 w-3 mr-1" aria-hidden="true" /> Chat
           </Button>
-        </div>
-      </nav>
+        }
+      />
 
       <div className="max-w-5xl mx-auto px-6 py-6">
         {/* VexReview enable banner */}

@@ -1,7 +1,3 @@
-/* Space Grotesk — display/headings. Geist Sans — body/UI. Geist Mono — labels, badges, code. */
-@import "@fontsource/space-grotesk/500.css";
-@import "@fontsource/space-grotesk/600.css";
-@import "@fontsource/space-grotesk/700.css";
 @import "@fontsource/geist-sans/400.css";
 @import "@fontsource/geist-sans/500.css";
 @import "@fontsource/geist-sans/600.css";
@@ -15,63 +11,55 @@
 @tailwind utilities;
 
 @layer base {
-  /*
-   * Redesign note: primary hue stays in the teal/emerald family (~160-172°) that
-   * was already the brand color — deliberately NOT blue/indigo. What changed is
-   * the neutrals (warm, not blue-tinted) and a rounder --radius for the new
-   * minimal-SaaS structural language. Old utility classes below (blueprint-grid,
-   * corner-frame, teal-glow, grid-line-*) are left untouched — still used by
-   * every other page — new ones are added alongside, not in place of them.
-   */
   :root,
   .dark {
-    --background: 220 18% 4%;
-    --foreground: 210 20% 98%;
+    --background: 160 10% 6%;
+    --foreground: 140 13% 96%;
 
-    --card: 220 15% 8%;
-    --card-foreground: 210 15% 92%;
+    --card: 144 10% 10%;
+    --card-foreground: 140 13% 96%;
 
-    --popover: 220 15% 8%;
-    --popover-foreground: 210 15% 92%;
+    --popover: 144 10% 10%;
+    --popover-foreground: 140 13% 96%;
 
-    --primary: 160 70% 45%;
-    --primary-foreground: 220 20% 6%;
+    --primary: 158 64% 52%;
+    --primary-foreground: 152 68% 7%;
 
-    --secondary: 220 12% 14%;
-    --secondary-foreground: 220 10% 75%;
+    --secondary: 143 11% 15%;
+    --secondary-foreground: 138 10% 74%;
 
-    --muted: 220 12% 12%;
-    --muted-foreground: 220 8% 55%;
+    --muted: 143 11% 15%;
+    --muted-foreground: 137 7% 59%;
 
-    --accent: 160 30% 16%;
-    --accent-foreground: 210 15% 92%;
+    --accent: 158 18% 13%;
+    --accent-foreground: 140 13% 96%;
 
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 79% 72%;
+    --destructive-foreground: 152 68% 7%;
 
-    --border: 220 12% 16%;
-    --input: 220 12% 16%;
-    --ring: 160 70% 45%;
+    --border: 144 9% 21%;
+    --input: 144 9% 21%;
+    --ring: 158 64% 52%;
 
     --radius: 0.625rem;
 
-    --sidebar-background: 220 15% 7%;
-    --sidebar-foreground: 220 10% 72%;
-    --sidebar-primary: 160 70% 45%;
-    --sidebar-primary-foreground: 220 20% 6%;
-    --sidebar-accent: 220 12% 12%;
-    --sidebar-accent-foreground: 220 10% 80%;
-    --sidebar-border: 220 12% 16%;
-    --sidebar-ring: 160 70% 45%;
+    --sidebar-background: 144 10% 10%;
+    --sidebar-foreground: 138 10% 74%;
+    --sidebar-primary: 158 64% 52%;
+    --sidebar-primary-foreground: 152 68% 7%;
+    --sidebar-accent: 143 11% 15%;
+    --sidebar-accent-foreground: 138 10% 74%;
+    --sidebar-border: 144 9% 21%;
+    --sidebar-ring: 158 64% 52%;
 
     /* Semantic tokens */
-    --surface-elevated: 220 14% 10%;
-    --surface-glass: 220 14% 9%;
-    --code-bg: 220 16% 7%;
-    --success: 152 55% 42%;
-    --warning: 38 70% 50%;
+    --surface-elevated: 143 11% 15%;
+    --surface-glass: 144 10% 10%;
+    --code-bg: 160 10% 6%;
+    --success: 158 64% 52%;
+    --warning: 35 83% 65%;
     --info: 200 70% 50%;
-    --glow: 160 70% 45%;
+    --glow: 158 64% 52%;
   }
 
   .light {
@@ -129,9 +117,38 @@
     @apply border-border;
   }
 
+  html {
+    scroll-padding-top: 9rem;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-size: 0.875rem;
+    line-height: 1.5;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  html[data-reduced-motion="true"] *,
+  html[data-reduced-motion="true"] *::before,
+  html[data-reduced-motion="true"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 
   ::-webkit-scrollbar {
@@ -161,6 +178,12 @@
     animation: shimmer 2s linear infinite;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .animate-shimmer {
+      animation: none;
+    }
+  }
+
   @keyframes shimmer {
     0% { background-position: -200% center; }
     100% { background-position: 200% center; }
@@ -174,10 +197,10 @@
     @apply bg-card/40 backdrop-blur-md border border-border/30 rounded-xl transition-all duration-200 hover:bg-card/70 hover:border-primary/30;
   }
 
-  .font-serif {
-    font-family: Georgia, serif;
-    letter-spacing: -0.01em;
-  }
+    .font-serif {
+      font-family: "Geist Sans", system-ui, sans-serif;
+      letter-spacing: -0.01em;
+    }
 
   .grid-line-h {
     @apply absolute left-0 right-0 h-px bg-foreground/5;

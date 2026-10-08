@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Check, Loader2, GitBranch, Download, Cpu, Database, AlertCircle } from "lucide-react";
+import { Check, Loader2, GitBranch, Cpu, Database, AlertCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { indexRepository, generateOverview, ingestCodeChunks } from "@/lib/api";
 import { useRepoStore } from "@/lib/store";
@@ -11,19 +11,13 @@ import { useSettingsStore } from "@/lib/settings-store";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { safeSetRepoCache } from "@/lib/repo-cache";
 
-const STAGES_FULL = [
-  { label: "Fetching file tree", icon: GitBranch },
-  { label: "Downloading files", icon: Download },
-  { label: "Analyzing & chunking", icon: Cpu },
+const STAGES = [
+  { label: "Fetching repository", icon: GitBranch },
+  { label: "Indexing for search", icon: Cpu },
   { label: "Generating overview", icon: Database },
 ];
 
-const STAGES_ON_DEMAND = [
-  { label: "Fetching file tree", icon: GitBranch },
-  { label: "Downloading skeleton files", icon: Download },
-  { label: "Building on-demand index", icon: Cpu },
-  { label: "Generating overview", icon: Database },
-];
+type IngestState = "idle" | "active" | "done" | "error";
 
 const IndexingProgress = () => {
   const { repoId } = useParams();
@@ -35,6 +29,7 @@ const IndexingProgress = () => {
 
   const [currentStage, setCurrentStage] = useState(0);
   const [fileCount, setFileCount] = useState(0);
+  const [ingestState, setIngestState] = useState<IngestState>("idle");
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [githubUrl, setGithubUrl] = useState("");
@@ -42,8 +37,6 @@ const IndexingProgress = () => {
   const [newToken, setNewToken] = useState("");
   const [isOnDemand, setIsOnDemand] = useState(false);
   const started = useRef(false);
-
-  const STAGES = isOnDemand ? STAGES_ON_DEMAND : STAGES_FULL;
 
   useEffect(() => {
     const state = location.state as { githubUrl?: string; githubToken?: string } | null;
@@ -83,7 +76,7 @@ const IndexingProgress = () => {
             console.log("Found cached index for:", githubUrl);
             const data = JSON.parse(cached);
             setRepoData(data);
-            setCurrentStage(4);
+            setCurrentStage(3);
             setDone(true);
             setIndexing(false);
             setTimeout(() => navigate(`/repo/${data.repoId}`), 800);
@@ -91,28 +84,17 @@ const IndexingProgress = () => {
           }
         }
 
-        setIndexing(true, 1, "Fetching file tree...");
+        setIndexing(true, 1, "Fetching repository...");
         setCurrentStage(1);
-        
-        // ... rest of the existing indexing logic ...
-        const stageTimer = setInterval(() => {
-          setFileCount((c) => Math.min(c + Math.floor(Math.random() * 8 + 2), 500));
-        }, 100);
-        const stage2Timer = setTimeout(() => setCurrentStage(2), 2000);
-        const stage3Timer = setTimeout(() => setCurrentStage(3), 5000);
 
         const data = await indexRepository(githubUrl, githubToken);
-
-        clearInterval(stageTimer);
-        clearTimeout(stage2Timer);
-        clearTimeout(stage3Timer);
 
         // Detect on-demand mode
         const onDemandMode = data.indexMode === "on-demand";
         setIsOnDemand(onDemandMode);
 
         setFileCount(data.totalFiles);
-        setCurrentStage(3);
+        setCurrentStage(2);
 
         const repoData = {
           repoId: data.repoId,
@@ -134,10 +116,9 @@ const IndexingProgress = () => {
           safeSetRepoCache(`repo_cache_${githubUrl}`, repoData);
         }
 
-        setCurrentStage(4);
-
         // Fire off code chunk ingestion to Pinecone + Prisma (background)
         // This populates the search index for hybrid RAG in AI chat
+        setIngestState("active");
         ingestCodeChunks(
           data.repoId,
           data.fileContents.map(f => ({ path: f.path, content: f.content })),
@@ -150,15 +131,21 @@ const IndexingProgress = () => {
             forks: data.meta?.forks,
           }
         )
-          .then(res => console.log(`[ingest] Ingested ${res.count} code chunks for ${data.repoId}`))
+          .then(res => {
+            console.log(`[ingest] Ingested ${res.count} code chunks for ${data.repoId}`);
+            setIngestState("done");
+          })
           .catch(err => {
             console.error("[ingest] Code chunk ingestion failed:", err);
+            setIngestState("error");
             toast({
               title: "Search indexing failed",
               description: "The repo indexed, but hybrid search/chat context won't be available. " + (err instanceof Error ? err.message : "Unknown error"),
               variant: "destructive",
             });
           });
+
+        setCurrentStage(3);
 
         try {
           const overview = await generateOverview(data.repoContext);
@@ -206,7 +193,21 @@ const IndexingProgress = () => {
 
   const displayUrl = githubUrl
     ? githubUrl.replace("https://github.com/", "")
-    : repoId === "custom-repo" ? "user/repo" : `vercel/${repoId}`;
+    : repoId === "custom-repo" ? "user/repo" : repoId;
+
+  const stageStatus = (index: number): "complete" | "active" | "error" | "idle" => {
+    if (done) return "complete";
+    if (index === 0) return currentStage >= 2 ? "complete" : currentStage === 1 ? "active" : "idle";
+    if (index === 1) {
+      if (ingestState === "error") return "error";
+      if (ingestState === "done") return "complete";
+      return currentStage >= 2 ? "active" : "idle";
+    }
+    return currentStage >= 3 ? "active" : "idle";
+  };
+
+  const completedStages = STAGES.filter((_, i) => stageStatus(i) === "complete").length;
+  const progressPct = done ? 100 : Math.round((completedStages / STAGES.length) * 100);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -216,44 +217,50 @@ const IndexingProgress = () => {
           <p className="text-xs font-mono text-muted-foreground truncate">{displayUrl}</p>
         </div>
 
-        <div className="space-y-3 mb-6">
+        <div className="space-y-3 mb-6" role="status" aria-live="polite">
           {STAGES.map((stage, i) => {
-            const stageNum = i + 1;
-            const isActive = currentStage === stageNum;
-            const isComplete = currentStage > stageNum;
+            const status = stageStatus(i);
 
             return (
-              <div key={i} className="flex items-center gap-3">
+              <div key={stage.label} className="flex items-center gap-3">
                 <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 transition-colors ${
-                  isComplete ? "bg-success/15 text-success"
-                  : isActive ? "bg-primary/15 text-primary"
+                  status === "complete" ? "bg-success/15 text-success"
+                  : status === "active" ? "bg-primary/15 text-primary"
+                  : status === "error" ? "bg-destructive/10 text-destructive"
                   : "bg-muted text-muted-foreground"
                 }`}>
-                  {isComplete ? <Check className="h-3.5 w-3.5" />
-                  : isActive ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <stage.icon className="h-3.5 w-3.5" />}
+                  {status === "complete" ? <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  : status === "active" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  : status === "error" ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                  : <stage.icon className="h-3.5 w-3.5" aria-hidden="true" />}
                 </div>
                 <p className={`text-xs transition-colors ${
-                  isComplete ? "text-success" : isActive ? "text-foreground" : "text-muted-foreground"
-                }`}>{stage.label}</p>
+                  status === "complete" ? "text-success"
+                  : status === "active" ? "text-foreground"
+                  : status === "error" ? "text-destructive"
+                  : "text-muted-foreground"
+                }`}>
+                  {stage.label}
+                  {i === 1 && status === "error" && " — failed, continuing without search"}
+                </p>
               </div>
             );
           })}
         </div>
 
         <div className="mb-4">
-          <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5">
-            <span>{fileCount} files</span>
-            <span>{Math.min(Math.round((currentStage / 4) * 100), 100)}%</span>
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>{fileCount > 0 ? `${fileCount.toLocaleString()} files` : "Reading repository…"}</span>
+            <span>{progressPct}%</span>
           </div>
           <div className="h-1 rounded-full bg-muted overflow-hidden">
             <motion.div className="h-full rounded-full bg-primary"
-              animate={{ width: `${Math.min((currentStage / 4) * 100, 100)}%` }}
+              animate={{ width: `${progressPct}%` }}
               transition={{ duration: 0.5 }} />
           </div>
         </div>
 
-        {isOnDemand && currentStage >= 2 && (
+        {isOnDemand && (
           <motion.div 
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -280,7 +287,7 @@ const IndexingProgress = () => {
                   placeholder="ghp_xxxxxxxxxxxx"
                   value={newToken}
                   onChange={(e) => setNewToken(e.target.value)}
-                  className="w-full bg-background/50 border border-white/10 rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-primary/40 transition-all"
+                  className="w-full bg-background/50 border border-border rounded-xl px-3 py-2 text-xs font-mono outline-none focus:border-primary/40 transition-all"
                 />
                 <div className="flex gap-2">
                   <Button onClick={handleRetry} className="flex-1 h-8 text-[11px] bg-primary text-primary-foreground hover:bg-primary/90">

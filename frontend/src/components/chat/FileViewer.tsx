@@ -124,15 +124,15 @@ const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: Fil
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
         <div className="flex items-center gap-2 min-w-0">
           <FileCode className="h-3 w-3 text-muted-foreground shrink-0" />
-          <span className="text-[11px] text-foreground truncate">{citation.filePath}</span>
+          <span className="text-xs text-foreground truncate">{citation.filePath}</span>
           {isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />}
           {loadError && (
-            <button onClick={handleRetry} className="text-[10px] text-destructive shrink-0 hover:underline cursor-pointer">
+            <button onClick={handleRetry} className="text-xs text-destructive shrink-0 hover:underline cursor-pointer">
               Failed — Retry
             </button>
           )}
           {shouldHighlight && (
-            <span className="text-[10px] text-primary shrink-0">
+            <span className="text-xs text-primary shrink-0">
               L{citation.startLine}–{citation.endLine}
             </span>
           )}
