@@ -264,7 +264,7 @@ test("validation HTTP failures are sanitized, unavailable, and retryable", async
   await pc.ensureIndex();
 });
 
-test("upsert preserves the deterministic SHA256 UUID and string nodeId roundtrip", async () => {
+test("upsert uses the original node IDs and string nodeId roundtrip", async () => {
   const pc = await adapter();
   const p = point();
   p.payload.nodeId = "must-be-overwritten";
@@ -274,9 +274,8 @@ test("upsert preserves the deterministic SHA256 UUID and string nodeId roundtrip
   await pc.upsertChunks([p]);
   const writes = calls("/vectors/upsert");
   const first = (writes[0].body.vectors as WireRecord[])[0];
-  assert.equal(first.id, "8830c046-fd5b-483f-9a0b-eaf4e9c270a2");
-  assert.match(first.id, /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
-  assert.equal((writes[1].body.vectors as WireRecord[])[0].id, first.id);
+  assert.equal(first.id, p.id);
+  assert.equal((writes[1].body.vectors as WireRecord[])[0].id, p.id);
   assert.equal(first.metadata.nodeId, p.id);
   assert.equal(typeof first.metadata.nodeId, "string");
   assert.deepEqual(first.values, p.vector);

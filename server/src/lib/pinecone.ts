@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   Pinecone,
   type Index,
@@ -187,18 +186,6 @@ async function getValidatedIndex(): Promise<{ index: Index<NodePayload>; namespa
   return { index: state.index, namespace: state.namespace };
 }
 
-/** Preserve Actian's storage IDs so repeated ingestion remains an upsert. */
-function deterministicPointId(nodeId: string): string {
-  const hex = createHash("sha256").update(nodeId).digest("hex").slice(0, 32);
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    "4" + hex.slice(13, 16),
-    ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16) + hex.slice(17, 20),
-    hex.slice(20, 32),
-  ].join("-");
-}
-
 function validateVector(vector: number[]): void {
   if (vector.length !== DIMENSION || vector.some((value) => !Number.isFinite(value))) {
     throw new Error(`[pinecone] Expected a ${DIMENSION}-dimensional vector of finite numbers.`);
@@ -218,8 +205,12 @@ export async function upsertChunks(points: NodePoint[]): Promise<void> {
   // Preflight every record before sending any batches (including oversized inputs).
   const records = points.map((point) => {
     validateVector(point.vector);
+    // Pinecone record IDs are free-form strings, so the GitPlus node ID is
+    // used as-is — repeated ingestion of the same node ID remains an upsert
+    // with no UUID translation. `nodeId` is still mirrored into metadata for
+    // records written before this change (then stored under a derived UUID).
     const record: PineconeRecord<NodePayload> = {
-      id: deterministicPointId(point.id),
+      id: point.id,
       values: point.vector,
       metadata: { ...point.payload, nodeId: point.id },
     };
