@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState, useEffect } from "react";
 import { useUserAuth } from "@/hooks/use-user-auth";
-import { useCompactMode } from "@/hooks/use-compact-mode";
-import { fetchUserRepositories } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ExternalLink, GitBranch, Globe, Loader2, Lock, RefreshCw, Search, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Search, GitBranch, Lock, Globe, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Repository {
   id: number;
@@ -23,175 +21,151 @@ interface UserReposProps {
   onIndex: (repoUrl: string) => void;
 }
 
-interface RepositoryListState {
-  userId: string | null;
-  repos: Repository[];
-  loading: boolean;
-  refreshing: boolean;
-  error: string | null;
-}
-
 export function UserRepos({ onIndex }: UserReposProps) {
-  const { user } = useUserAuth();
-  const userId = user?.id ?? null;
-  const compact = useCompactMode();
-  const requestGeneration = useRef(0);
+  const { fetchUserRepos, user } = useUserAuth();
+  const [repos, setRepos] = useState<Repository[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [list, setList] = useState<RepositoryListState>({
-    userId: null, repos: [], loading: false, refreshing: false, error: null,
-  });
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadRepos = useCallback(async (isRefresh = false) => {
-    if (!userId) return;
-    const generation = ++requestGeneration.current;
-    setList((previous) => ({
-      userId,
-      repos: previous.userId === userId ? previous.repos : [],
-      loading: !isRefresh || previous.userId !== userId,
-      refreshing: isRefresh,
-      error: null,
-    }));
-
+  const loadRepos = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    
     try {
-      const repos = await fetchUserRepositories();
-      if (generation !== requestGeneration.current) return;
-      setList({ userId, repos, loading: false, refreshing: false, error: null });
-    } catch (error) {
-      if (generation !== requestGeneration.current) return;
-      setList((previous) => ({
-        ...previous,
-        loading: false,
-        refreshing: false,
-        error: error instanceof Error ? error.message : "Could not load repositories from GitHub.",
-      }));
+      const data = await fetchUserRepos();
+      setRepos(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-  }, [userId]);
+  };
 
   useEffect(() => {
-    setSearch("");
-    void loadRepos();
-    return () => { requestGeneration.current += 1; };
-  }, [loadRepos]);
+    if (user) loadRepos();
+  }, [user]);
 
-  if (!userId) return null;
-
-  const loading = list.userId !== userId || list.loading;
-  const query = search.trim().toLowerCase();
-  const filteredRepos = list.repos.filter((repo) =>
-    repo.full_name.toLowerCase().includes(query) ||
-    (repo.description?.toLowerCase().includes(query) ?? false)
+  const filteredRepos = repos.filter(repo => 
+    repo.name.toLowerCase().includes(search.toLowerCase()) ||
+    (repo.description?.toLowerCase().includes(search.toLowerCase()))
   );
 
-  return (
-    <section aria-labelledby="github-repositories-title" className={cn("space-y-4", compact ? "py-4" : "py-6")}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 id="github-repositories-title" className="text-lg font-semibold">Your GitHub repositories</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Select a repository to analyze, or paste a URL above.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => void loadRepos(true)}
-          disabled={loading || list.refreshing}
-          className="min-h-11 gap-2 self-start sm:min-h-9"
-        >
-          <RefreshCw className={cn("h-4 w-4", list.refreshing && "animate-spin")} aria-hidden="true" />
-          {list.refreshing ? "Refreshing…" : "Refresh"}
-        </Button>
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <p className="text-sm text-muted-foreground font-medium">Fetching your repositories...</p>
       </div>
+    );
+  }
 
-      {loading ? (
-        <div role="status" className="flex items-center gap-3 rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          Loading repositories from GitHub…
-        </div>
-      ) : (
-        <>
-          {list.error && (
-            <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-              <p className="text-sm font-medium">Couldn’t {list.repos.length ? "refresh" : "load"} your GitHub repositories.</p>
-              <p className="mt-1 break-words text-sm text-muted-foreground">{list.error}</p>
-              {list.repos.length > 0 && <p className="mt-1 text-sm text-muted-foreground">Showing the last loaded list.</p>}
-              <Button variant="outline" onClick={() => void loadRepos(true)} disabled={list.refreshing} className="mt-3 min-h-11 gap-2 sm:min-h-9">
-                <RefreshCw className="h-4 w-4" aria-hidden="true" /> Try again
-              </Button>
+  return (
+    <section className="py-20 border-t border-border bg-card/30">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-2">My Repositories</p>
+            <h2 className="text-2xl md:text-3xl font-semibold text-foreground">
+              Select a repository to index
+            </h2>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search repos..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-10 w-full md:w-64 bg-background border-border text-sm"
+              />
             </div>
-          )}
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => loadRepos(true)} 
+              disabled={refreshing}
+              className="h-10 w-10 shrink-0"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+        </div>
 
-          {list.repos.length > 0 && (
-            <>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div className="w-full sm:max-w-sm">
-                  <label htmlFor="github-repository-filter" className="mb-1.5 block text-sm font-medium">Filter repositories</label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                    <Input
-                      id="github-repository-filter"
-                      placeholder="Owner, name, or description"
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      className="min-h-11 pl-9 text-sm sm:min-h-9"
-                    />
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <AnimatePresence mode="popLayout">
+            {filteredRepos.map((repo, i) => (
+              <motion.div
+                key={repo.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                className="group flex flex-col p-5 rounded-lg border border-border bg-card hover:border-primary/30 hover:bg-accent/10 transition-all cursor-default relative overflow-hidden"
+              >
+                {/* Status indicator */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded flex items-center justify-center bg-accent group-hover:bg-primary/10 transition-colors">
+                      <GitBranch className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-mono text-muted-foreground leading-none mb-1">
+                        {repo.language || "Unknown"}
+                      </span>
+                      <h3 className="text-sm font-semibold text-foreground truncate max-w-[160px]">
+                        {repo.name}
+                      </h3>
+                    </div>
+                  </div>
+                  
+                  <div className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-tight flex items-center gap-1 ${
+                    repo.private ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                  }`}>
+                    {repo.private ? <Lock className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
+                    {repo.private ? "Private" : "Public"}
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground" role="status">
-                  {filteredRepos.length} of {list.repos.length} loaded repositories
+
+                <p className="text-xs text-muted-foreground line-clamp-2 mb-6 h-8 leading-relaxed">
+                  {repo.description || "No description provided."}
                 </p>
-              </div>
 
-              {filteredRepos.length ? (
-                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-4">
-                  {filteredRepos.map((repo) => (
-                    <li key={repo.id} className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/40 sm:p-5">
-                      <div className="min-w-0">
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                          <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                          <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
-                            {repo.private ? <Lock className="h-3 w-3" aria-hidden="true" /> : <Globe className="h-3 w-3" aria-hidden="true" />}
-                            {repo.private ? "Private" : "Public"}
-                          </span>
-                        </div>
-                        <h3 className="text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{repo.full_name}</h3>
-                        {repo.description && <p className="mt-2 break-words text-sm leading-relaxed text-secondary-foreground">{repo.description}</p>}
-                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-                          {repo.language && <span>{repo.language}</span>}
-                          <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5" aria-hidden="true" /> {repo.stargazers_count.toLocaleString()} stars</span>
-                          <span>Updated <time dateTime={repo.updated_at}>{new Date(repo.updated_at).toLocaleDateString()}</time></span>
-                        </div>
-                      </div>
-                      <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
-                        <Button variant="outline" asChild className="h-11 flex-1 gap-2 px-3 sm:h-10">
-                          <a href={repo.html_url} target="_blank" rel="noopener noreferrer" aria-label={`View ${repo.full_name} on GitHub`}>
-                            <ExternalLink className="h-4 w-4" aria-hidden="true" /> GitHub
-                          </a>
-                        </Button>
-                        <Button variant="secondary" onClick={() => onIndex(repo.html_url)} className="h-11 flex-1 px-3 sm:h-10" aria-label={`Analyze ${repo.full_name}`}>
-                          Analyze
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border p-5 text-sm">
-                  <p className="font-medium">No repositories match this filter.</p>
-                  <p className="mt-1 text-muted-foreground">Try another owner, name, or description.</p>
-                  <Button variant="outline" onClick={() => setSearch("")} className="mt-3 min-h-11 sm:min-h-9">Clear filter</Button>
+                <div className="mt-auto flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => window.open(repo.html_url, "_blank")}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      title="View on GitHub"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="text-[10px] text-muted-foreground">
+                      Updated {new Date(repo.updated_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <Button 
+                    size="sm" 
+                    onClick={() => onIndex(repo.html_url)}
+                    className="h-7 px-3 text-[10px] font-black uppercase tracking-widest bg-teal-500 text-black hover:bg-teal-400 transition-all rounded-lg"
+                  >
+                    Index Repo
+                  </Button>
                 </div>
-              )}
-            </>
-          )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
 
-          {!list.error && list.repos.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border p-5 text-sm">
-              <p className="font-medium">GitHub returned no repositories.</p>
-              <p className="mt-1 text-muted-foreground">You can still paste a public repository URL above, or refresh the list.</p>
-            </div>
-          )}
-        </>
-      )}
+        {filteredRepos.length === 0 && !loading && (
+          <div className="flex flex-col items-center justify-center py-20 border border-dashed border-border rounded-lg bg-accent/5">
+            <p className="text-sm text-muted-foreground">No repositories found matching your search.</p>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

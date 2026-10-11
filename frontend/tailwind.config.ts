@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Geist Sans", "system-ui", "sans-serif"],
+        display: ["Space Grotesk", "system-ui", "sans-serif"],
         sans: ["Geist Sans", "system-ui", "sans-serif"],
         mono: ["Geist Mono", "monospace"],
       },

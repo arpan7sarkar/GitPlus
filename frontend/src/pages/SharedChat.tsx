@@ -52,24 +52,24 @@ const SharedChat = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <nav className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
+      <nav className="shrink-0 flex items-center justify-between h-11 px-4 border-b border-border bg-card">
         <div className="flex items-center gap-3">
           <Terminal className="h-4 w-4 text-primary" />
-          <span className="min-w-0 break-all text-sm text-secondary-foreground">
+          <span className="font-mono text-xs text-muted-foreground">
             {meta.owner}/<span className="text-foreground font-semibold">{meta.name}</span>
             <span className="text-muted-foreground"> · Shared Chat</span>
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded">Read-only</span>
+          <ThemeToggle className="h-6 w-6 border-none" />
+          <span className="text-[10px] font-mono text-muted-foreground bg-secondary px-2 py-0.5 rounded">Read-only</span>
           <button onClick={() => navigate("/")} className="text-xs text-primary hover:underline font-mono flex items-center gap-1">
             <ExternalLink className="h-3 w-3" /> Try GitPlus
           </button>
         </div>
       </nav>
 
-      <main id="main-content" tabIndex={-1} className="relative flex min-h-0 flex-1">
+      <div className="flex-1 flex min-h-0">
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {session.messages.map((msg) => (
@@ -90,11 +90,11 @@ const SharedChat = () => {
         <AnimatePresence>
           {activeCitation && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="absolute inset-0 z-30 w-full shrink-0 overflow-hidden bg-background lg:static lg:w-[40%]"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: "40%", opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="shrink-0 overflow-hidden"
             >
               <FileViewer
                 citation={activeCitation}
@@ -106,7 +106,7 @@ const SharedChat = () => {
           )}
         </AnimatePresence>
 
-      </main>
+      </div>
     </div>
   );
 };

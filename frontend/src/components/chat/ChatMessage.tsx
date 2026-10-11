@@ -13,21 +13,22 @@ const ChatMessageComponent = memo(({ message, onCitationClick }: ChatMessageProp
   const isUser = message.role === "user";
 
   return (
-    <div className={`flex min-w-0 gap-2.5 ${isUser ? "flex-row-reverse" : ""}`}>
-      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0">
-        {isUser ? <User className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> : <Bot className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
-        <span className="sr-only">{isUser ? "You" : "Assistant"}</span>
+    <div className={`flex gap-2.5 ${isUser ? "flex-row-reverse" : ""}`}>
+      <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${
+        isUser ? "bg-muted" : "bg-primary/10"
+      }`}>
+        {isUser ? <User className="h-3 w-3 text-muted-foreground" /> : <Bot className="h-3 w-3 text-primary" />}
       </div>
-      <div className={`min-w-0 max-w-[calc(100%-2.625rem)] sm:max-w-[85%] ${isUser ? "text-right" : ""}`}>
-        <div className={`inline-block min-w-0 max-w-full text-left px-3 py-2.5 rounded-md text-sm leading-relaxed ${
+      <div className={`max-w-[85%] ${isUser ? "text-right" : ""}`}>
+        <div className={`inline-block text-left px-3 py-2.5 rounded text-sm leading-relaxed ${
           isUser
-            ? "bg-muted border border-border text-secondary-foreground"
+            ? "bg-primary/8 border border-primary/15 text-foreground"
             : "bg-card border border-border text-secondary-foreground"
         }`}>
           <Markdown>{message.content}</Markdown>
         </div>
         {message.citations && message.citations.length > 0 && (
-          <div className="flex min-w-0 flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-1 mt-1.5">
             {message.citations.map((citation, i) => (
               <CitationChip key={i} citation={citation} onClick={onCitationClick} />
             ))}

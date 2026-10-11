@@ -2,20 +2,21 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MessageSquare, Clock,
+  ChevronLeft, Code2, MessageSquare, Clock,
   ExternalLink, Loader2, AlertCircle, Sparkles, X, GitCommit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRepoStore } from "@/lib/store";
-import WorkspaceNav from "@/components/layout/WorkspaceNav";
-import NoRepoLoaded from "@/components/layout/NoRepoLoaded";
+import { DEMO_REPOS } from "@/lib/mock-data";
 import { fetchCommits, type GitHubCommit, streamChat } from "@/lib/api";
+import { useCompactMode } from "@/hooks/use-compact-mode";
 
 const RepoCommits = () => {
   const { repoId } = useParams();
   const navigate = useNavigate();
+  const compact = useCompactMode();
   const { meta: storeMeta, repoContext, githubToken } = useRepoStore();
-  const repo = storeMeta;
+  const repo = storeMeta || DEMO_REPOS.find((r) => r.id === repoId) || DEMO_REPOS[0];
 
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,6 @@ const RepoCommits = () => {
   }, []);
 
   async function loadCommits() {
-    if (!repo) return;
     setLoading(true);
     setError(null);
     try {
@@ -42,15 +42,6 @@ const RepoCommits = () => {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (!repo) {
-    return (
-      <div className="min-h-screen bg-background">
-        <WorkspaceNav repoId={repoId ?? ""} active="commits" />
-        <NoRepoLoaded repoId={repoId} />
-      </div>
-    );
   }
 
   async function explainCommit(commit: GitHubCommit) {
@@ -94,22 +85,29 @@ Based on the message and your repo context, what is likely happening here? What 
 
   return (
     <div className="min-h-screen bg-background">
-      <WorkspaceNav
-        repoId={repoId ?? ""}
-        owner={repo.owner}
-        name={repo.name}
-        active="commits"
-        actions={
-          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-11 px-3 text-sm sm:h-9">
-            <MessageSquare className="h-3 w-3 mr-1" aria-hidden="true" /> Chat
+      {/* Nav */}
+      <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto flex items-center justify-between h-11 px-6">
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate(`/repo/${repoId}`)} className="text-muted-foreground hover:text-foreground transition-colors">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <Code2 className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs text-muted-foreground">
+              {repo.owner}/<span className="text-foreground font-medium">{repo.name}</span>
+              <span className="text-muted-foreground ml-1">/ commits</span>
+            </span>
+          </div>
+          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-7 px-3 text-[11px]">
+            <MessageSquare className="h-3 w-3 mr-1" /> Chat
           </Button>
-        }
-      />
+        </div>
+      </nav>
 
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+      <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="flex items-center gap-2 mb-4 px-2">
           <GitCommit className="h-4 w-4 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Recent commits</h1>
+          <h2 className="text-sm font-semibold text-foreground">Recent Commits</h2>
         </div>
 
         {/* Loading */}
@@ -131,7 +129,7 @@ Based on the message and your repo context, what is likely happening here? What 
                 <h3 className="text-sm font-semibold text-foreground mb-1">Unable to Load Commits</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed mb-3">{error}</p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => loadCommits()} className="h-11 px-3 text-sm sm:h-9">
+                  <Button variant="outline" size="sm" onClick={() => loadCommits()} className="h-7 px-3 text-[11px]">
                     <Loader2 className={`h-3 w-3 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Retry
                   </Button>
                 </div>
@@ -158,19 +156,19 @@ Based on the message and your repo context, what is likely happening here? What 
                   <div className="flex items-start gap-3">
                     <GitCommit className={`h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground`} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-foreground [overflow-wrap:anywhere]">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-medium text-foreground">
                             {c.commit.message.split('\n')[0]}
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-xs text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded">
+                            <span className="text-[10px] text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded">
                               {c.sha.slice(0, 7)}
                             </span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                               by {c.author?.login || c.commit.author.name}
                             </span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                               <Clock className="h-2.5 w-2.5" /> {timeAgo(c.commit.author.date)}
                             </span>
                           </div>
@@ -179,7 +177,7 @@ Based on the message and your repo context, what is likely happening here? What 
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-11 px-3 text-sm sm:h-9"
+                            className="h-6 px-2 text-[10px]"
                             onClick={() => explainCommit(c)}
                           >
                             <Sparkles className="h-3 w-3 mr-1 text-primary" /> Explain
@@ -188,8 +186,7 @@ Based on the message and your repo context, what is likely happening here? What 
                             href={c.html_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label={`Open commit ${c.sha.slice(0, 7)} on GitHub`}
-                            className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:h-9 sm:w-9"
+                            className="text-muted-foreground hover:text-foreground transition-colors"
                           >
                             <ExternalLink className="h-3 w-3" />
                           </a>
@@ -202,7 +199,7 @@ Based on the message and your repo context, what is likely happening here? What 
             )}
           </div>
         )}
-      </main>
+      </div>
 
       {/* AI Review Panel */}
       <AnimatePresence>
@@ -228,7 +225,7 @@ Based on the message and your repo context, what is likely happening here? What 
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-11 px-3 text-sm sm:h-9"
+                    className="h-6 px-2 text-[10px]"
                     onClick={() =>
                       navigate(`/repo/${repoId}/chat`, {
                         state: { initialQuestion: `Help me understand this commit ${selectedCommit.sha.slice(0, 7)}: ${selectedCommit.commit.message}` },
@@ -239,8 +236,7 @@ Based on the message and your repo context, what is likely happening here? What 
                   </Button>
                   <button
                     onClick={() => { setAiResponse(""); setSelectedCommit(null); }}
-                    aria-label="Close commit explanation"
-                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:h-9 sm:w-9"
+                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

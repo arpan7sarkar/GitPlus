@@ -7,7 +7,6 @@
  */
 
 import { minimatch } from "minimatch";
-import { getGeminiChatModel } from "../models.js";
 
 /**
  * Token accounting.
@@ -29,7 +28,7 @@ export class TokenLimits {
   responseTokens: number;
   knowledgeCutOff: string;
 
-  constructor(model = getGeminiChatModel()) {
+  constructor(model = "gemini-2.0-flash") {
     this.knowledgeCutOff = "2024-04-01";
     if (model.includes("pro")) {
       this.maxTokens = 1_048_576;

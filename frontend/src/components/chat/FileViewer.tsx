@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X, FileCode, Loader2 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { a11yDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { useTheme } from "@/hooks/use-theme";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { Citation } from "@/lib/mock-data";
 import { useRepoStore } from "@/lib/store";
 import { fetchFileContent } from "@/lib/api";
@@ -42,7 +41,6 @@ const detectLanguage = (filePath: string): string => {
 };
 
 const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: FileViewerProps) => {
-  const { theme } = useTheme();
   const { fileContents, meta, githubToken: storeToken, upsertFileContent } = useRepoStore();
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -126,27 +124,27 @@ const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: Fil
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
         <div className="flex items-center gap-2 min-w-0">
           <FileCode className="h-3 w-3 text-muted-foreground shrink-0" />
-          <span className="text-xs text-foreground truncate">{citation.filePath}</span>
+          <span className="text-[11px] text-foreground truncate">{citation.filePath}</span>
           {isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />}
           {loadError && (
-            <button onClick={handleRetry} className="text-xs text-destructive shrink-0 hover:underline cursor-pointer">
+            <button onClick={handleRetry} className="text-[10px] text-destructive shrink-0 hover:underline cursor-pointer">
               Failed — Retry
             </button>
           )}
           {shouldHighlight && (
-            <span className="text-xs text-primary shrink-0">
+            <span className="text-[10px] text-primary shrink-0">
               L{citation.startLine}–{citation.endLine}
             </span>
           )}
         </div>
-        <button onClick={onClose} aria-label="Close file viewer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-accent sm:h-9 sm:w-9">
+        <button onClick={onClose} className="p-1 hover:bg-accent/30 rounded transition-colors">
           <X className="h-3 w-3 text-muted-foreground" />
         </button>
       </div>
       <div className="flex-1 overflow-auto">
         <SyntaxHighlighter
           language={language}
-          style={theme === "dark" ? a11yDark : oneLight}
+          style={vscDarkPlus}
           showLineNumbers
           startingLineNumber={1}
           wrapLines
@@ -156,13 +154,13 @@ const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: Fil
                 shouldHighlight &&
                 lineNumber >= citation.startLine &&
                 lineNumber <= citation.endLine
-                  ? "hsl(var(--warning) / 0.1)"
+                  ? "rgba(210, 160, 60, 0.06)"
                   : undefined,
               borderLeft:
                 shouldHighlight &&
                 lineNumber >= citation.startLine &&
                 lineNumber <= citation.endLine
-                  ? "2px solid hsl(var(--warning))"
+                  ? "2px solid hsl(210, 60%, 55%)"
                   : "2px solid transparent",
               display: "block",
               paddingLeft: "8px",
@@ -171,10 +169,8 @@ const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: Fil
           customStyle={{
             margin: 0,
             padding: "6px 0",
-            background: "hsl(var(--code-bg))",
-            color: "hsl(var(--foreground))",
-            fontFamily: '"Geist Mono", monospace',
-            fontSize: "13px",
+            background: "hsl(220, 14%, 9%)",
+            fontSize: "11px",
             lineHeight: "1.6",
           }}
         >

@@ -4,8 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
-import { useLayoutEffect } from "react";
-import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { useSettingsStore } from "@/lib/settings-store";
 import Landing from "./pages/Landing";
 import IndexingProgress from "./pages/IndexingProgress";
 import RepoDashboard from "./pages/RepoDashboard";
@@ -29,22 +28,19 @@ import Profile from "./pages/Profile";
 import MyRepos from "./pages/MyRepos";
 import Settings from "./pages/Settings";
 import OurPhilosophy from "./pages/OurPhilosophy";
+import CLIPage from "./pages/CLIPage";
+import SDKPage from "./pages/SDKPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  const reducedMotion = useReducedMotion();
-
-  useLayoutEffect(() => {
-    document.documentElement.dataset.reducedMotion = String(reducedMotion);
-    return () => { delete document.documentElement.dataset.reducedMotion; };
-  }, [reducedMotion]);
-
+  const { settings } = useSettingsStore();
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <MotionConfig reducedMotion={reducedMotion ? "always" : "never"}>
+        <MotionConfig reducedMotion={settings.reducedMotion ? "always" : "never"}>
           <Toaster />
           <Sonner />
           <BrowserRouter>

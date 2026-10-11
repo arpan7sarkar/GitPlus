@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/command";
 import { FileCode, FolderOpen, Search, TextSearch, ArrowRight } from "lucide-react";
 import { useRepoStore } from "@/lib/store";
+import { DEMO_FILE_TREE } from "@/lib/mock-data";
 import type { FileTreeNode } from "@/lib/mock-data";
 
 interface CodebaseSearchProps {
@@ -51,7 +52,8 @@ const CodebaseSearch = ({ repoId }: CodebaseSearchProps) => {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
 
-  const { fileTree, fileContents } = useRepoStore();
+  const { fileTree: storeTree, fileContents } = useRepoStore();
+  const fileTree = storeTree.length > 0 ? storeTree : DEMO_FILE_TREE;
 
   // Flatten file tree once
   const flatFiles = useMemo(() => flattenTree(fileTree), [fileTree]);

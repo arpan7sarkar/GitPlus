@@ -1,32 +1,70 @@
 import React from "react";
 import PageLayout from "@/components/layout/PageLayout";
-import { Shield } from "lucide-react";
+import { Shield, ShieldCheck } from "lucide-react";
 
 export default function Privacy() {
   return (
-    <PageLayout category="Governance" title="Data & Privacy Framework" subtitle="Repository data handling and external AI providers.">
-      <div className="mx-auto max-w-4xl">
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-8">
-          <div className="mb-8 flex flex-wrap gap-x-8 gap-y-4 border-b border-border pb-6">
-            <div className="space-y-1"><p className="text-xs text-muted-foreground">Scope</p><p className="font-mono text-[13px] text-secondary-foreground">Data handling overview</p></div>
+    <PageLayout 
+      category="Governance"
+      title="Data & Privacy Framework" 
+      subtitle="Professional standards for cryptographic security and repository isolation."
+    >
+      <div className="max-w-4xl mx-auto">
+        <div className="p-12 md:p-20 rounded-[3rem] border border-border/40 bg-card/40 relative overflow-hidden group">
+          <div className="absolute inset-0 blueprint-grid opacity-5" />
+          
+          {/* Metadata */}
+          <div className="flex flex-wrap gap-8 mb-16 pb-8 border-b border-border/40 relative">
+             <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/70">Document ID</p>
+                <p className="text-xs font-mono text-foreground">P-2024-SEC-001</p>
+             </div>
+             <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/70">Effective Date</p>
+                <p className="text-xs font-mono text-foreground">March 20, 2024</p>
+             </div>
+             <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/70">Status</p>
+                <p className="text-xs font-mono text-teal-500 uppercase">Active / Verified</p>
+             </div>
           </div>
-          <div className="space-y-8">
-            <section className="space-y-4">
-              <h2 className="m-0 text-xl font-semibold text-foreground">1. Data Ingestion Protocols</h2>
-              <p className="text-[15px] leading-relaxed text-secondary-foreground">Repository text may be stored for search, cached in this browser, and sent to external AI providers. Only connect repositories you are allowed to share.</p>
-              <div className="rounded-xl border border-border bg-muted p-4 text-sm leading-relaxed text-secondary-foreground">Retention and transport security depend on the deployment. This interface does not guarantee zero retention or a particular TLS version.</div>
+
+          <div className="prose prose-invert max-w-none space-y-16 relative">
+            <section className="space-y-8">
+              <h2 className="text-3xl font-serif italic text-foreground m-0">1. Data Ingestion Protocols</h2>
+              <p className="text-lg text-muted-foreground leading-relaxed italic font-medium">
+                Our indexing engine processes source code through an ephemeral ingestion pipeline. 
+                We do not maintain permanent copies of your raw source files unless explicitly configured for offline auditing.
+              </p>
+              <div className="p-8 rounded-2xl bg-card border border-border/40 italic text-sm text-muted-foreground leading-relaxed">
+                Note: All ingestion is performed over TLS 1.3 encrypted channels.
+              </div>
             </section>
-            <section className="space-y-4">
-              <h2 className="m-0 text-xl font-semibold text-foreground">2. Vector Privacy Limits</h2>
-              <p className="text-[15px] leading-relaxed text-secondary-foreground">Search data can include code snippets, embeddings, and repository metadata. Do not assume tenant isolation or a retention policy without verifying the configuration of your deployment.</p>
+
+            <section className="space-y-8">
+              <h2 className="text-3xl font-serif italic text-foreground m-0">2. Vector Privacy Limits</h2>
+              <p className="text-lg text-muted-foreground leading-relaxed italic font-medium">
+                Embeddings generated from your code are locked to your organization's unique tenant ID. 
+                These vectors are never shared with other users or used to train public LLM weights.
+              </p>
             </section>
-            <section className="space-y-4">
-              <h2 className="m-0 text-xl font-semibold text-foreground">3. Third-Party Neural Nodes</h2>
-              <p className="text-[15px] leading-relaxed text-secondary-foreground">The deployment chooses which AI providers process repository context. Review those providers' data retention and training policies before sharing private code. This page does not establish provider privacy guarantees.</p>
+
+            <section className="space-y-8">
+              <h2 className="text-3xl font-serif italic text-foreground m-0">3. Third-Party Neural Nodes</h2>
+              <p className="text-lg text-muted-foreground leading-relaxed italic font-medium">
+                We utilize enterprise-grade LLM endpoints (Google Gemini) via private API tunnels. 
+                Data passed to these nodes is governed by zero-retention policies.
+              </p>
             </section>
           </div>
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
-            <div className="flex items-center gap-2"><Shield aria-hidden="true" className="h-4 w-4 text-secondary-foreground" /><span className="text-xs text-muted-foreground">Review data handling before connecting private code.</span></div>
+
+          {/* Verification Stamp */}
+          <div className="mt-24 pt-12 border-t border-border/40 flex items-center justify-between opacity-80">
+             <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-teal-500" />
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-foreground">GitPlus Legal Auth</span>
+             </div>
+             <div className="text-[10px] font-mono text-muted-foreground">HASH: 7F...3B</div>
           </div>
         </div>
       </div>

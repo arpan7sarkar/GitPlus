@@ -1,173 +1,139 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, FolderGit2, GitFork, Loader2, RefreshCw, Search, Star } from "lucide-react";
+import { motion } from "framer-motion";
+import { GitBranch, Star, GitFork, MessageSquare, ExternalLink, Loader2, FolderGit2 } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useUserAuth } from "@/hooks/use-user-auth";
-import { useCompactMode } from "@/hooks/use-compact-mode";
 import { fetchIndexedRepos, type IndexedRepoEntry } from "@/lib/api";
 import { LoginDialog } from "@/components/auth/LoginDialog";
-import { cn } from "@/lib/utils";
-
-interface IndexedRepositoryListState {
-  userId: string | null;
-  repos: IndexedRepoEntry[];
-  loading: boolean;
-  refreshing: boolean;
-  error: string | null;
-}
 
 const MyRepos = () => {
   const { user, loading: authLoading } = useUserAuth();
-  const userId = user?.id ?? null;
   const navigate = useNavigate();
-  const compact = useCompactMode();
-  const requestGeneration = useRef(0);
+  const [repos, setRepos] = useState<IndexedRepoEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
-  const [filter, setFilter] = useState("");
-  const [list, setList] = useState<IndexedRepositoryListState>({
-    userId: null, repos: [], loading: false, refreshing: false, error: null,
-  });
-
-  const loadRepos = useCallback(async (isRefresh = false) => {
-    if (!userId) return;
-    const generation = ++requestGeneration.current;
-    setList((previous) => ({
-      userId,
-      repos: previous.userId === userId ? previous.repos : [],
-      loading: !isRefresh || previous.userId !== userId,
-      refreshing: isRefresh,
-      error: null,
-    }));
-
-    try {
-      const repos = await fetchIndexedRepos();
-      if (generation !== requestGeneration.current) return;
-      setList({ userId, repos, loading: false, refreshing: false, error: null });
-    } catch (error) {
-      if (generation !== requestGeneration.current) return;
-      setList((previous) => ({
-        ...previous,
-        loading: false,
-        refreshing: false,
-        error: error instanceof Error ? error.message : "Could not load your saved repositories.",
-      }));
-    }
-  }, [userId]);
 
   useEffect(() => {
-    setFilter("");
-    void loadRepos();
-    return () => { requestGeneration.current += 1; };
-  }, [loadRepos]);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    fetchIndexedRepos()
+      .then(setRepos)
+      .catch((err) => console.error("[my-repos] Failed to load indexed repos:", err))
+      .finally(() => setLoading(false));
+  }, [user]);
 
-  const loading = authLoading || (userId !== null && (list.userId !== userId || list.loading));
-  const query = filter.trim().toLowerCase();
-  const filteredRepos = list.repos.filter((repo) =>
-    `${repo.owner}/${repo.name}`.toLowerCase().includes(query) ||
-    (repo.description?.toLowerCase().includes(query) ?? false)
-  );
-  const workspaceSearch = compact ? "?mode=compact" : "";
+  if (!authLoading && !user) {
+    return (
+      <PageLayout title="My Repos" subtitle="Sign in to see every repository you've analyzed." category="Account">
+        <div className="flex flex-col items-center text-center py-16 gap-6">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <FolderGit2 className="h-7 w-7 text-primary" />
+          </div>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Your indexed repos are tied to your GitHub account. Sign in to see the full list and jump back into any of them.
+          </p>
+          <Button onClick={() => setShowLoginDialog(true)} className="rounded-full">Sign in with GitHub</Button>
+        </div>
+        <LoginDialog open={showLoginDialog} onOpenChange={setShowLoginDialog} />
+      </PageLayout>
+    );
+  }
 
   return (
-    <PageLayout title="My Repos" subtitle="Previously indexed repositories linked to your account." category="Workspace">
+    <PageLayout
+      title="My Repos"
+      subtitle="Every repository you've analyzed, ready to pick back up."
+      category="Account"
+    >
       {loading ? (
-        <div role="status" className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          {authLoading ? "Checking your session…" : "Loading your saved repositories…"}
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading your repositories...</p>
         </div>
-      ) : !user ? (
-        <div className="space-y-3 py-4">
-          <FolderGit2 className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">Sign in to return to your repositories</h2>
-          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">Your saved repository list is linked to your GitHub account.</p>
-          <Button onClick={() => setShowLoginDialog(true)} className="min-h-11 sm:min-h-9">Sign in with GitHub</Button>
+      ) : repos.length === 0 ? (
+        <div className="flex flex-col items-center text-center py-16 gap-6">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <FolderGit2 className="h-7 w-7 text-primary" />
+          </div>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            You haven't analyzed any repositories yet. Paste a GitHub URL on the homepage to get started.
+          </p>
+          <Button onClick={() => navigate("/")} className="rounded-full">Index a repository</Button>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">Open a repository overview to continue exploring its code.</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => void loadRepos(true)} disabled={list.refreshing} className="min-h-11 gap-2 sm:min-h-9">
-                <RefreshCw className={cn("h-4 w-4", list.refreshing && "animate-spin")} aria-hidden="true" />
-                {list.refreshing ? "Refreshing…" : "Refresh"}
-              </Button>
-              <Button onClick={() => navigate(`/${workspaceSearch}`)} className="min-h-11 sm:min-h-9">Analyze a repository</Button>
-            </div>
-          </div>
-
-          {list.error && (
-            <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-              <p className="text-sm font-medium">Couldn’t {list.repos.length ? "refresh" : "load"} your saved repositories.</p>
-              <p className="mt-1 break-words text-sm text-muted-foreground">{list.error}</p>
-              {list.repos.length > 0 && <p className="mt-1 text-sm text-muted-foreground">Showing the last loaded list.</p>}
-              <Button variant="outline" onClick={() => void loadRepos(true)} disabled={list.refreshing} className="mt-3 min-h-11 gap-2 sm:min-h-9">
-                <RefreshCw className="h-4 w-4" aria-hidden="true" /> Try again
-              </Button>
-            </div>
-          )}
-
-          {list.repos.length > 0 && (
-            <>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div className="w-full sm:max-w-sm">
-                  <label htmlFor="saved-repository-filter" className="mb-1.5 block text-sm font-medium">Filter saved repositories</label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                    <Input id="saved-repository-filter" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Owner, name, or description" className="min-h-11 pl-9 text-sm sm:min-h-9" />
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {repos.map((repo, i) => (
+            <motion.div
+              key={repo.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.05, 0.4) }}
+              className="rounded-2xl border border-border/40 bg-card p-6 flex flex-col gap-4 hover:border-primary/30 transition-all"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                    <GitBranch className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground truncate">{repo.owner}</p>
+                    <h3 className="text-sm font-semibold text-foreground truncate">{repo.name}</h3>
                   </div>
                 </div>
-                <p role="status" className="text-sm text-muted-foreground">{filteredRepos.length} of {list.repos.length} saved repositories</p>
+                <a
+                  href={`https://github.com/${repo.owner}/${repo.name}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+                  title="View on GitHub"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
               </div>
 
-              {filteredRepos.length ? (
-                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-4">
-                  {filteredRepos.map((repo) => (
-                    <li key={repo.id} className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/40 sm:p-5">
-                      <div className="min-w-0">
-                        <h2 className="text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{repo.owner}/{repo.name}</h2>
-                        {repo.description && <p className="mt-2 break-words text-sm leading-relaxed text-secondary-foreground">{repo.description}</p>}
-                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
-                          {repo.language && <span>{repo.language}</span>}
-                          {repo.stars !== null && <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5" aria-hidden="true" /> {repo.stars.toLocaleString()} stars</span>}
-                          {repo.forks !== null && <span className="inline-flex items-center gap-1"><GitFork className="h-3.5 w-3.5" aria-hidden="true" /> {repo.forks.toLocaleString()} forks</span>}
-                          <span>Indexed <time dateTime={repo.lastIndexedAt}>{new Date(repo.lastIndexedAt).toLocaleDateString()}</time></span>
-                        </div>
-                      </div>
-                      <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                        <Button variant="outline" asChild className="h-11 gap-2 px-3 sm:h-10">
-                          <a href={`https://github.com/${repo.owner}/${repo.name}`} target="_blank" rel="noopener noreferrer" aria-label={`View ${repo.owner}/${repo.name} on GitHub`}>
-                            <ExternalLink className="h-4 w-4" aria-hidden="true" /> GitHub
-                          </a>
-                        </Button>
-                        <Button variant="secondary" onClick={() => navigate(`/repo/${repo.repoId}${workspaceSearch}`)} className="h-11 flex-1 px-3 sm:h-10" aria-label={`Open ${repo.owner}/${repo.name}`}>
-                          Open overview
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border p-5 text-sm">
-                  <p className="font-medium">No saved repositories match this filter.</p>
-                  <p className="mt-1 text-muted-foreground">Try another owner, name, or description.</p>
-                  <Button variant="outline" onClick={() => setFilter("")} className="mt-3 min-h-11 sm:min-h-9">Clear filter</Button>
-                </div>
-              )}
-            </>
-          )}
+              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 h-8">
+                {repo.description || "No description provided."}
+              </p>
 
-          {!list.error && list.repos.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border p-5 text-sm">
-              <p className="font-medium">No indexed repositories are linked to this account yet.</p>
-              <p className="mt-1 text-muted-foreground">Analyze a repository from the homepage, then refresh this list after indexing finishes.</p>
-              <Button onClick={() => navigate(`/${workspaceSearch}`)} className="mt-3 min-h-11 sm:min-h-9">Analyze a repository</Button>
-            </div>
-          )}
+              <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                {repo.language && (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                    {repo.language}
+                  </span>
+                )}
+                {repo.stars !== null && (
+                  <span className="flex items-center gap-1"><Star className="h-3 w-3" /> {repo.stars.toLocaleString()}</span>
+                )}
+                {repo.forks !== null && (
+                  <span className="flex items-center gap-1"><GitFork className="h-3 w-3" /> {repo.forks.toLocaleString()}</span>
+                )}
+              </div>
+
+              <div className="mt-auto flex items-center justify-between pt-3 border-t border-border/40">
+                <span className="text-[10px] text-muted-foreground">
+                  Indexed {new Date(repo.lastIndexedAt).toLocaleDateString()}
+                </span>
+                {/* Routes through the dashboard, not chat directly — dashboard has the
+                    auto-fetch fallback that repopulates state on a cold page load
+                    (e.g. arriving straight from this list); chat doesn't, and would
+                    silently fall back to demo data if opened first. */}
+                <Button
+                  size="sm"
+                  onClick={() => navigate(`/repo/${repo.repoId}`)}
+                  className="h-7 px-3 text-[11px] rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <MessageSquare className="h-3 w-3 mr-1.5" /> Open
+                </Button>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
-      <LoginDialog open={showLoginDialog} onOpenChange={setShowLoginDialog} />
     </PageLayout>
   );
 };

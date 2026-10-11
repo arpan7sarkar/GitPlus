@@ -16,7 +16,6 @@
 
 import { Router, Request, Response } from "express";
 import { retrieveForQuery } from "../lib/retrieval.js";
-import { getGeminiChatModel, getOpenAIChatModel } from "../lib/models.js";
 
 const router = Router();
 
@@ -27,22 +26,20 @@ interface ProviderConfig {
   getKey: () => string | undefined;
 }
 
-function getProviders(): ProviderConfig[] {
-  return [
-    {
-      name: "gemini",
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      model: getGeminiChatModel(),
-      getKey: () => process.env.GOOGLE_GEMINI_API_KEY,
-    },
-    {
-      name: "openai",
-      url: "https://api.openai.com/v1/chat/completions",
-      model: getOpenAIChatModel(),
-      getKey: () => process.env.OPENAI_API_KEY,
-    },
-  ];
-}
+const PROVIDERS: ProviderConfig[] = [
+  {
+    name: "gemini",
+    url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    model: process.env.GOOGLE_GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+    getKey: () => process.env.GOOGLE_GEMINI_API_KEY,
+  },
+  {
+    name: "openai",
+    url: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-4o-mini",
+    getKey: () => process.env.OPENAI_API_KEY,
+  },
+];
 
 const COOLDOWN_MS = 60_000; // 60-second cooldown after 429
 const rateLimitState: Record<string, number> = {};
@@ -60,7 +57,7 @@ function markRateLimited(providerName: string) {
 }
 
 function getAvailableProviders(): ProviderConfig[] {
-  return getProviders().filter(isProviderAvailable);
+  return PROVIDERS.filter(isProviderAvailable);
 }
 
 function buildPrompts(action: string, repoContext: string, messages: any[]) {

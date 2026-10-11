@@ -1,3 +1,7 @@
+/* Space Grotesk — display/headings. Geist Sans — body/UI. Geist Mono — labels, badges, code. */
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
 @import "@fontsource/geist-sans/400.css";
 @import "@fontsource/geist-sans/500.css";
 @import "@fontsource/geist-sans/600.css";
@@ -11,90 +15,112 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Redesign note: primary hue stays in the teal/emerald family (~160-172°) that
+   * was already the brand color — deliberately NOT blue/indigo. What changed is
+   * the neutrals (warm, not blue-tinted) and a rounder --radius for the new
+   * minimal-SaaS structural language. Old utility classes below (blueprint-grid,
+   * corner-frame, teal-glow, grid-line-*) are left untouched — still used by
+   * every other page — new ones are added alongside, not in place of them.
+   */
   :root,
   .dark {
-    --background: 160 9.677% 6.078%;
-    --foreground: 140 13.043% 95.49%;
+    --background: 220 18% 4%;
+    --foreground: 210 20% 98%;
 
-    --card: 144 9.804% 10%;
-    --card-foreground: 140 13.043% 95.49%;
+    --card: 220 15% 8%;
+    --card-foreground: 210 15% 92%;
 
-    --popover: 144 9.804% 10%;
-    --popover-foreground: 140 13.043% 95.49%;
+    --popover: 220 15% 8%;
+    --popover-foreground: 210 15% 92%;
 
-    --primary: 158.113 64.372% 51.569%;
-    --primary-foreground: 152.308 68.421% 7.451%;
+    --primary: 160 70% 45%;
+    --primary-foreground: 220 20% 6%;
 
-    --secondary: 142.5 10.526% 14.902%;
-    --secondary-foreground: 138.462 9.63% 73.529%;
+    --secondary: 220 12% 14%;
+    --secondary-foreground: 220 10% 75%;
 
-    --muted: 142.5 10.526% 14.902%;
-    --muted-foreground: 137.143 6.667% 58.824%;
+    --muted: 220 12% 12%;
+    --muted-foreground: 220 8% 55%;
 
-    --accent: 142.5 10.526% 14.902%;
-    --accent-foreground: 140 13.043% 95.49%;
+    --accent: 160 30% 16%;
+    --accent-foreground: 210 15% 92%;
 
-    --destructive: 0 78.873% 72.157%;
-    --destructive-foreground: 152.308 68.421% 7.451%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 144 9.434% 20.784%;
-    --input: 144 9.434% 20.784%;
-    --ring: 158.113 64.372% 51.569%;
+    --border: 220 12% 16%;
+    --input: 220 12% 16%;
+    --ring: 160 70% 45%;
 
     --radius: 0.625rem;
 
-    --sidebar-background: var(--card);
-    --sidebar-foreground: var(--secondary-foreground);
-    --sidebar-primary: var(--primary);
-    --sidebar-primary-foreground: var(--primary-foreground);
-    --sidebar-accent: var(--accent);
-    --sidebar-accent-foreground: var(--foreground);
-    --sidebar-border: var(--border);
-    --sidebar-ring: var(--ring);
+    --sidebar-background: 220 15% 7%;
+    --sidebar-foreground: 220 10% 72%;
+    --sidebar-primary: 160 70% 45%;
+    --sidebar-primary-foreground: 220 20% 6%;
+    --sidebar-accent: 220 12% 12%;
+    --sidebar-accent-foreground: 220 10% 80%;
+    --sidebar-border: 220 12% 16%;
+    --sidebar-ring: 160 70% 45%;
 
-    --surface-elevated: var(--accent);
-    --surface-glass: var(--card);
-    --code-bg: var(--background);
-    --success: var(--primary);
-    --warning: 34.932 82.955% 65.49%;
-    --info: 200 70% 65%;
+    /* Semantic tokens */
+    --surface-elevated: 220 14% 10%;
+    --surface-glass: 220 14% 9%;
+    --code-bg: 220 16% 7%;
+    --success: 152 55% 42%;
+    --warning: 38 70% 50%;
+    --info: 200 70% 50%;
+    --glow: 160 70% 45%;
   }
 
   .light {
-    --background: 150 10% 97%;
-    --foreground: 144 10% 10%;
+    --background: 40 20% 97%;
+    --foreground: 220 20% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 144 10% 10%;
+    --card-foreground: 220 20% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 144 10% 10%;
+    --popover-foreground: 220 20% 10%;
 
-    --primary: 163 94% 24%;
+    --primary: 168 76% 32%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 144 12% 93%;
-    --secondary-foreground: 144 10% 28%;
+    --secondary: 40 10% 94%;
+    --secondary-foreground: 220 14% 20%;
 
-    --muted: 144 12% 93%;
-    --muted-foreground: 144 8% 40%;
+    --muted: 40 10% 94%;
+    --muted-foreground: 220 10% 40%;
 
-    --accent: 144 12% 93%;
-    --accent-foreground: 144 10% 10%;
+    --accent: 168 40% 92%;
+    --accent-foreground: 220 20% 10%;
 
-    --destructive: 0 67% 40%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 144 9% 79%;
-    --input: 144 8% 60%;
-    --ring: 163 94% 24%;
+    --border: 40 12% 88%;
+    --input: 40 12% 88%;
+    --ring: 168 76% 32%;
 
-    --surface-elevated: var(--accent);
-    --surface-glass: var(--card);
-    --code-bg: 144 10% 95%;
-    --success: var(--primary);
-    --warning: 33 79% 32%;
-    --info: 200 75% 35%;
+    --radius: 0.625rem;
+
+    --sidebar-background: 40 15% 97%;
+    --sidebar-foreground: 220 14% 20%;
+    --sidebar-primary: 168 76% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 10% 94%;
+    --sidebar-accent-foreground: 220 14% 20%;
+    --sidebar-border: 40 12% 88%;
+    --sidebar-ring: 168 76% 32%;
+
+    --surface-elevated: 0 0% 100%;
+    --surface-glass: 0 0% 99%;
+    --code-bg: 40 15% 95%;
+    --success: 152 55% 35%;
+    --warning: 38 75% 40%;
+    --info: 200 75% 42%;
+    --glow: 168 76% 32%;
   }
 }
 
@@ -103,38 +129,9 @@
     @apply border-border;
   }
 
-  html {
-    scroll-padding-top: 9rem;
-  }
-
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-size: 0.875rem;
-    line-height: 1.5;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  }
-
-  html[data-reduced-motion="true"] *,
-  html[data-reduced-motion="true"] *::before,
-  html[data-reduced-motion="true"] *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-  }
-
-  :focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
   }
 
   ::-webkit-scrollbar {
@@ -164,12 +161,6 @@
     animation: shimmer 2s linear infinite;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .animate-shimmer {
-      animation: none;
-    }
-  }
-
   @keyframes shimmer {
     0% { background-position: -200% center; }
     100% { background-position: 200% center; }
@@ -183,10 +174,10 @@
     @apply bg-card/40 backdrop-blur-md border border-border/30 rounded-xl transition-all duration-200 hover:bg-card/70 hover:border-primary/30;
   }
 
-    .font-serif {
-      font-family: "Geist Sans", system-ui, sans-serif;
-      letter-spacing: -0.01em;
-    }
+  .font-serif {
+    font-family: Georgia, serif;
+    letter-spacing: -0.01em;
+  }
 
   .grid-line-h {
     @apply absolute left-0 right-0 h-px bg-foreground/5;

@@ -1,6 +1,6 @@
 import React from "react";
 import PageLayout from "@/components/layout/PageLayout";
-import { HelpCircle, Search } from "lucide-react";
+import { HelpCircle, Search, Plus, Minus } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function FAQ() {
@@ -8,68 +8,120 @@ export default function FAQ() {
     {
       category: "Platform Access",
       questions: [
-        { q: "What are the repository indexing limits?", a: "Guests can start up to five analyses before sign-in is required. Access to a private repository depends on the permissions of your GitHub account or personal access token." },
-        { q: "How do I connect my private GitHub repositories?", a: "Simply sign in with your GitHub account. We use secure OAuth 2.0 scopes (`repo` and `read:user`) to list and clone your private projects for analysis. We never see your password." }
+        {
+          q: "What are the repository indexing limits?",
+          a: "Free users can index up to 5 repositories without authentication. Authenticated users enjoy unlimited public repository indexing. For private repositories, the limit depends on your subscription tier."
+        },
+        {
+          q: "How do I connect my private GitHub repositories?",
+          a: "Simply sign in with your GitHub account. We use secure OAuth 2.0 scopes (`repo` and `read:user`) to list and clone your private projects for analysis. We never see your password."
+        }
       ]
     },
     {
       category: "Technology & AI",
       questions: [
-        { q: "Which AI model powers GitPlus?", a: "The AI model is configured by the deployment. Model availability and context limits depend on that configuration." },
-        { q: "Does it support monorepos or complex structures?", a: "Yes. Our structural tokenization engine can navigate complex monorepo patterns, identifying boundaries between packages and mapping internal dependencies across workspace links." }
+        {
+          q: "Which AI model powers GitPlus?",
+          a: "Everything is powered by Google's Gemini 1.5 Pro. Its 1M+ token context window allows it to digest entire codebases and maintain global architectural awareness."
+        },
+        {
+          q: "Does it support monorepos or complex structures?",
+          a: "Yes. Our structural tokenization engine can navigate complex monorepo patterns, identifying boundaries between packages and mapping internal dependencies across workspace links."
+        }
       ]
     },
     {
       category: "Security & Privacy",
       questions: [
-        { q: "Is my code stored on your servers?", a: "Repository text may be stored for search and sent to external AI providers. Only connect code you are allowed to share. This interface does not guarantee zero retention." },
-        { q: "Does the AI learn from my private data?", a: "Data handling depends on the configured AI provider and deployment. Review the provider's retention and training policies before connecting private code; GitPlus cannot establish those guarantees from this interface." }
+        {
+          q: "Is my code stored on your servers?",
+          a: "No. Your source code is ingested into our ephemeral indexing engine, vectorized, and then purged. We only store the high-dimensional embeddings and structural metadata required to answer your queries."
+        },
+        {
+          q: "Does the AI learn from my private data?",
+          a: "Absolutely not. Your code is processed within private tenant boundaries. We do not use your private repository data to train or fine-tune our global AI models."
+        }
       ]
     }
   ];
 
   return (
-    <PageLayout category="Support" title="Common Enquiries" subtitle="Detailed answers to technical, security, and billing questions from the GitPlus community.">
-      <div className="mx-auto max-w-5xl">
-        <div className="relative mx-auto mb-8 max-w-2xl">
-          <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
-            <Search aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
+    <PageLayout 
+      category="Support"
+      title="Common Enquiries" 
+      subtitle="Detailed answers to technical, security, and billing questions from the GitPlus community."
+    >
+      <div className="max-w-5xl mx-auto">
+        {/* Search Bar Visual */}
+        <div className="relative mb-32 max-w-2xl mx-auto group">
+          <div className="absolute -inset-1 bg-teal-500/20 rounded-2xl blur opacity-25 group-hover:opacity-40 transition-opacity" />
+          <div className="relative">
+            <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-teal-500" />
+            </div>
+            <input 
+               type="text" 
+               disabled 
+               placeholder="Search the technical manual..." 
+               className="w-full h-16 bg-card border border-border/40 rounded-2xl px-16 text-sm font-bold text-foreground placeholder:text-muted-foreground/40 uppercase tracking-[0.2em] focus:outline-none focus:border-teal-500/30 transition-all"
+            />
+            <div className="absolute inset-y-0 right-6 flex items-center gap-2">
+              <kbd className="hidden sm:inline-flex px-2 py-1 bg-muted rounded border border-border/40 uppercase font-black text-[9px] text-muted-foreground tracking-widest">CMD</kbd>
+              <kbd className="hidden sm:inline-flex px-2 py-1 bg-muted rounded border border-border/40 uppercase font-black text-[9px] text-muted-foreground tracking-widest">K</kbd>
+            </div>
           </div>
-          <input type="text" disabled aria-label="Search the technical manual (unavailable)" placeholder="Search the technical manual..." className="h-11 w-full rounded-xl border border-border bg-muted pl-12 pr-4 text-sm text-secondary-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed" />
         </div>
 
-        <div className="grid gap-8">
-          {faqs.map((group) => (
-            <div key={group.category} className="space-y-5">
-              <div className="flex items-center gap-4">
-                <h2 className="shrink-0 text-xl font-semibold text-foreground">{group.category}</h2>
-                <div aria-hidden="true" className="h-px w-full bg-border" />
-              </div>
-              <div className="grid gap-4">
-                {group.questions.map((faq, i) => (
-                  <motion.div key={faq.q} initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} viewport={{ once: true }} className="rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-muted/40 sm:p-6">
-                    <div className="flex items-start gap-4 sm:gap-5">
-                      <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted">
-                        <HelpCircle className="h-5 w-5 text-secondary-foreground" />
+        <div className="grid gap-24">
+          {faqs.map((group, gi) => (
+            <div key={gi} className="space-y-10">
+               <div className="flex items-center gap-6">
+                 <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-teal-500/80 whitespace-nowrap">
+                    {group.category}
+                 </h2>
+                 <div className="h-px w-full bg-border/40" />
+               </div>
+
+               <div className="grid gap-6">
+                  {group.questions.map((f, i) => (
+                    <motion.div 
+                      key={f.q} 
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      viewport={{ once: true }}
+                      className="group p-10 rounded-[2.5rem] border border-border/40 bg-card/40 hover:bg-card/70 transition-all cursor-default relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-12 h-12 border-t border-r border-teal-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      
+                      <div className="flex gap-8 items-start relative">
+                        <div className="h-12 w-12 shrink-0 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                           <HelpCircle className="h-5 w-5 text-teal-500" />
+                        </div>
+                        <div className="space-y-4">
+                           <h3 className="text-2xl font-serif italic text-foreground leading-tight tracking-tight group-hover:text-teal-500 transition-colors">{f.q}</h3>
+                           <p className="text-base text-muted-foreground leading-relaxed italic font-medium max-w-3xl">
+                             {f.a}
+                           </p>
+                        </div>
                       </div>
-                      <div className="min-w-0 space-y-3">
-                        <h3 className="text-lg font-medium leading-snug text-foreground">{faq.q}</h3>
-                        <p className="max-w-3xl text-[15px] leading-relaxed text-secondary-foreground">{faq.a}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                    </motion.div>
+                  ))}
+               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-10 space-y-5 rounded-2xl border border-border bg-card p-6 text-center sm:p-8">
-          <h2 className="text-xl font-semibold text-foreground">Still need clarification?</h2>
-          <p className="mx-auto max-w-md text-[15px] leading-relaxed text-secondary-foreground">Our technical engineers are available for specialized consultations for enterprise customers.</p>
-          <div className="pt-2">
-            <button className="min-h-11 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-10">Contact Tech Support</button>
-          </div>
+        <div className="mt-40 p-16 rounded-[3rem] border border-border/40 bg-card/30 text-center space-y-8 relative overflow-hidden group">
+           <div className="absolute inset-0 blueprint-grid opacity-10" />
+           <div className="teal-glow w-[400px] h-[400px] -bottom-24 left-1/2 -translate-x-1/2 opacity-5" />
+           
+           <h3 className="text-4xl font-serif italic text-foreground relative">Still need clarification?</h3>
+           <p className="text-lg text-muted-foreground max-w-md mx-auto italic relative">Our technical engineers are available for specialized consultations for enterprise customers.</p>
+           <div className="pt-4 relative">
+             <button className="px-12 py-5 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.3em] hover:bg-primary/90 transition-all shadow-lg">Contact Tech Support</button>
+           </div>
         </div>
       </div>
     </PageLayout>

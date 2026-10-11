@@ -1,32 +1,25 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Download, Copy, Check, Loader2, FileText, Zap } from "lucide-react";
+import { ChevronLeft, Terminal, Download, Copy, Check, Loader2, FileText, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Markdown from "@/components/ui/markdown";
+import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useRepoStore } from "@/lib/store";
 import { generateOnboardingDoc } from "@/lib/api";
-import WorkspaceNav from "@/components/layout/WorkspaceNav";
-import NoRepoLoaded from "@/components/layout/NoRepoLoaded";
+import { DEMO_REPOS } from "@/lib/mock-data";
 import { toast } from "@/hooks/use-toast";
 
 const OnboardingDoc = () => {
   const { repoId } = useParams();
+  const navigate = useNavigate();
   const { meta, repoContext } = useRepoStore();
-  const repo = meta;
+  const repo = meta || DEMO_REPOS.find((r) => r.id === repoId) || DEMO_REPOS[0];
 
   const [markdown, setMarkdown] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  if (!repo) {
-    return (
-      <div className="min-h-screen bg-background">
-        <WorkspaceNav repoId={repoId ?? ""} active="onboarding" />
-        <NoRepoLoaded repoId={repoId} />
-      </div>
-    );
-  }
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -63,39 +56,45 @@ const OnboardingDoc = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <WorkspaceNav
-        repoId={repoId ?? ""}
-        owner={repo.owner}
-        name={repo.name}
-        active="onboarding"
-        actions={
-          markdown ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={handleCopy} className="h-11 text-sm sm:h-9" aria-label="Copy guide to clipboard">
-                {copied ? <Check className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5 mr-1" aria-hidden="true" />}
+      <nav className="sticky top-0 z-50 bg-glass border-b border-border/50">
+        <div className="container mx-auto flex items-center justify-between h-12 px-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(`/repo/${repoId}`)} className="text-muted-foreground hover:text-foreground transition-colors">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <Terminal className="h-4 w-4 text-primary" />
+            <span className="font-mono text-sm text-muted-foreground">
+              {repo.owner}/<span className="text-foreground font-semibold">{repo.name}</span>
+              <span className="text-muted-foreground"> · Onboarding Guide</span>
+            </span>
+          </div>
+          {markdown && (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={handleCopy} className="font-mono text-xs">
+                {copied ? <Check className="h-3.5 w-3.5 mr-1" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
                 {copied ? "Copied" : "Copy"}
               </Button>
-              <Button size="sm" onClick={handleDownload} className="h-11 text-sm sm:h-9" aria-label="Download guide as markdown">
-                <Download className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
-                .md
+              <Button size="sm" onClick={handleDownload} className="bg-primary text-primary-foreground hover:bg-primary/90 font-mono text-xs">
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Download .md
               </Button>
-            </>
-          ) : undefined
-        }
-      />
+            </div>
+          )}
+        </div>
+      </nav>
 
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
+      <div className="container mx-auto px-6 py-8 max-w-3xl">
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           {!markdown && !loading && (
             <div className="text-center py-20">
               <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
                 <FileText className="h-7 w-7 text-primary" />
               </div>
-              <h1 className="text-2xl font-semibold mb-2">Generate Onboarding Guide</h1>
-              <p className="text-secondary-foreground text-sm leading-relaxed mb-8 max-w-md mx-auto">
+              <h1 className="text-2xl font-bold mb-2">Generate Onboarding Guide</h1>
+              <p className="text-muted-foreground text-sm mb-8 max-w-md mx-auto">
                 AI will analyze the codebase and generate a comprehensive onboarding document with setup instructions, key files, patterns, and gotchas.
               </p>
-              <Button onClick={handleGenerate} className="h-11 text-sm font-medium sm:h-10">
+              <Button onClick={handleGenerate} className="bg-primary text-primary-foreground hover:bg-primary/90 font-mono">
                 <Zap className="h-4 w-4 mr-2" />
                 Generate Onboarding Guide
               </Button>
@@ -110,12 +109,32 @@ const OnboardingDoc = () => {
           )}
 
           {markdown && !loading && (
-            <Markdown className="text-[15px] leading-relaxed text-secondary-foreground [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg">
-              {markdown}
-            </Markdown>
+            <div className="prose prose-invert prose-sm max-w-none prose-headings:font-bold prose-headings:text-foreground prose-p:text-secondary-foreground prose-a:text-primary prose-code:text-primary prose-code:bg-secondary prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-code-bg prose-pre:border prose-pre:border-border prose-strong:text-foreground prose-li:text-secondary-foreground">
+              <ReactMarkdown
+                components={{
+                  code({ className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || "");
+                    const inline = !match;
+                    return inline ? (
+                      <code className={className} {...props}>{children}</code>
+                    ) : (
+                      <SyntaxHighlighter
+                        style={vscDarkPlus}
+                        language={match[1]}
+                        customStyle={{ margin: 0, background: "hsl(220, 20%, 8%)", fontSize: "12px" }}
+                      >
+                        {String(children).replace(/\n$/, "")}
+                      </SyntaxHighlighter>
+                    );
+                  },
+                }}
+              >
+                {markdown}
+              </ReactMarkdown>
+            </div>
           )}
         </motion.div>
-      </main>
+      </div>
     </div>
   );
 };

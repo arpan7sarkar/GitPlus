@@ -41,32 +41,30 @@ const Settings = () => {
     >
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Appearance Section */}
-        <div className="p-5 rounded-lg bg-card border border-border space-y-5">
+        <div className="p-8 rounded-[2.5rem] bg-card/40 border border-border/40 space-y-8">
           <div className="flex items-center gap-3 mb-2">
             <Eye className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-semibold text-foreground">Appearance</h3>
+            <h3 className="text-xl font-serif italic text-foreground">Appearance</h3>
           </div>
           
           <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label htmlFor="compact-mode" className="text-sm font-medium">Compact Mode</Label>
-                <p className="text-sm leading-relaxed text-secondary-foreground">Optimize UI for smaller screens and side-by-side work.</p>
+                <Label className="text-sm font-medium">Compact Mode</Label>
+                <p className="text-xs text-muted-foreground italic">Optimize UI for smaller screens and side-by-side work.</p>
               </div>
-              <Switch
-                id="compact-mode"
+              <Switch 
                 checked={settings.compactMode}
                 onCheckedChange={(val) => setSetting("compactMode", val)}
               />
             </div>
             
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label htmlFor="reduced-motion" className="text-sm font-medium">Reduced Motion</Label>
-                <p className="text-sm leading-relaxed text-secondary-foreground">Minimize animations throughout the application.</p>
+                <Label className="text-sm font-medium">Reduced Motion</Label>
+                <p className="text-xs text-muted-foreground italic">Minimize animations throughout the application.</p>
               </div>
-              <Switch
-                id="reduced-motion"
+              <Switch 
                 checked={settings.reducedMotion}
                 onCheckedChange={(val) => setSetting("reducedMotion", val)}
               />
@@ -75,32 +73,30 @@ const Settings = () => {
         </div>
  
         {/* Indexing Section */}
-        <div className="p-5 rounded-lg bg-card border border-border space-y-5">
+        <div className="p-8 rounded-[2.5rem] bg-card/40 border border-border/40 space-y-8">
           <div className="flex items-center gap-3 mb-2">
             <Database className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-semibold text-foreground">Indexing & Storage</h3>
+            <h3 className="text-xl font-serif italic text-foreground">Indexing & Storage</h3>
           </div>
           
           <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label htmlFor="cache-index-data" className="text-sm font-medium">Cache Index Data</Label>
-                <p className="text-sm leading-relaxed text-secondary-foreground">Store repository metadata locally for faster reloading.</p>
+                <Label className="text-sm font-medium">Cache Index Data</Label>
+                <p className="text-xs text-muted-foreground italic">Store repository metadata locally for faster reloading.</p>
               </div>
-              <Switch
-                id="cache-index-data"
+              <Switch 
                 checked={settings.cacheIndexData}
                 onCheckedChange={(val) => setSetting("cacheIndexData", val)}
               />
             </div>
             
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label htmlFor="autosave-chat-history" className="text-sm font-medium">Auto-save Chat History</Label>
-                <p className="text-sm leading-relaxed text-secondary-foreground">Automatically persist your AI conversations across sessions.</p>
+                <Label className="text-sm font-medium">Auto-save Chat History</Label>
+                <p className="text-xs text-muted-foreground italic">Automatically persist your AI conversations across sessions.</p>
               </div>
-              <Switch
-                id="autosave-chat-history"
+              <Switch 
                 checked={settings.autoSaveChatHistory}
                 onCheckedChange={(val) => setSetting("autoSaveChatHistory", val)}
               />
@@ -109,35 +105,34 @@ const Settings = () => {
         </div>
  
         {/* Security Section */}
-        <div className="p-5 rounded-lg bg-card border border-border space-y-5">
+        <div className="p-8 rounded-[2.5rem] bg-card/40 border border-border/40 space-y-8">
           <div className="flex items-center gap-3 mb-2">
             <Lock className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-semibold text-foreground">Security</h3>
+            <h3 className="text-xl font-serif italic text-foreground">Security</h3>
           </div>
           
           <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label htmlFor="strict-https" className="text-sm font-medium">Strict HTTPS Only</Label>
-                <p className="text-sm leading-relaxed text-secondary-foreground">Enforce secure connections for all API requests.</p>
+                <Label className="text-sm font-medium">Strict HTTPS Only</Label>
+                <p className="text-xs text-muted-foreground italic">Enforce secure connections for all API requests.</p>
               </div>
-              <Switch
-                id="strict-https"
+              <Switch 
                 checked={settings.strictHttps}
                 disabled 
               />
             </div>
             
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <Label className="text-sm font-medium">Personal Access Token Storage</Label>
-                <p className="text-sm leading-relaxed text-secondary-foreground">Manual GitHub tokens are stored in this browser’s localStorage, not encrypted.</p>
+                <p className="text-xs text-muted-foreground italic">Encrypted storage for manual GitHub tokens in localStorage.</p>
               </div>
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={handleClearTokens}
-                className="text-sm font-medium text-destructive"
+                className="text-[10px] uppercase tracking-widest text-destructive"
               >
                 Clear Tokens
               </Button>
@@ -149,13 +144,13 @@ const Settings = () => {
           <Button 
             variant="ghost" 
             onClick={handleReset}
-            className="text-sm font-medium"
+            className="text-[10px] uppercase tracking-widest"
           >
             Reset Defaults
           </Button>
           <Button 
             onClick={handleSave}
-            className="h-11 bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:h-10"
+            className="bg-white text-black text-[10px] uppercase tracking-widest font-black h-10 px-8 rounded-xl hover:bg-neutral-200"
           >
             Save Changes
           </Button>
