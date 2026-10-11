@@ -1,25 +1,85 @@
 /**
  * Embeddings Helper
- * Wraps OpenAI text-embedding-3-large, truncated to 1024 dimensions via OpenAI's
- * native `dimensions` param — large-model retrieval quality at roughly the storage/
- * cost of a mid-size model (full text-embedding-3-large is 3072 dims).
+ * Wraps the configured embedding provider (OpenAI by default, Gemini when
+ * EMBEDDING_PROVIDER=gemini) — see ./models.ts for the explicit configuration.
+ * The default is OpenAI text-embedding-3-large, truncated to 1024 dimensions
+ * via the native `dimensions` param — large-model retrieval quality at roughly
+ * the storage/cost of a mid-size model (full text-embedding-3-large is 3072 dims).
  *
- * Unlike summarize.ts, there's no fallback provider here — Pinecone's vector space
- * has to stay consistent, so a transient network blip (ECONNRESET etc., which
- * does happen against OpenAI) gets retried with backoff instead of failing the
- * whole ingest outright. A single uncaught throw here used to abort everything
- * downstream (Pinecone upsert, Postgres mirror, the IndexedRepo association) with
- * no partial-failure recovery.
+ * There is deliberately NO fallback between embedding providers: vectors from
+ * different models live in incompatible vector spaces, so a transient network
+ * blip (ECONNRESET etc., which does happen against OpenAI) gets retried with
+ * backoff instead of silently swapping models. A single uncaught throw here
+ * used to abort everything downstream (Pinecone upsert, Postgres mirror, the
+ * IndexedRepo association) with no partial-failure recovery.
+ *
+ * Consistency contract: every vector written at ingest time is tagged with its
+ * { provider, model, dimensions } (Pinecone metadata + Postgres Node mirror),
+ * and query time verifies stored vectors match the currently configured model
+ * via assertEmbeddingConsistency(). A mismatch — including legacy vectors that
+ * predate this tagging (e.g. anything previously embedded with Gemini while
+ * queries now embed with OpenAI) — throws a clear error directing the operator
+ * to re-ingest the repository instead of returning meaningless neighbours.
  */
 
 import OpenAI from "openai";
+import {
+  DEFAULT_EMBEDDING_DIMENSIONS,
+  DEFAULT_EMBEDDING_PROVIDER,
+  DEFAULT_OPENAI_EMBEDDING_MODEL,
+  describeEmbedding,
+  getEmbeddingConfig,
+  type EmbeddingConfig,
+} from "./models.js";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Import-time snapshots of the defaults, kept for backwards compatibility.
+// Use getEmbeddingConfig() for the live, env-resolved configuration.
+export const EMBEDDING_PROVIDER = DEFAULT_EMBEDDING_PROVIDER;
+export const EMBEDDING_MODEL = DEFAULT_OPENAI_EMBEDDING_MODEL;
+export const EMBEDDING_DIMENSIONS = DEFAULT_EMBEDDING_DIMENSIONS;
 
-export const EMBEDDING_MODEL = "text-embedding-3-large";
-export const EMBEDDING_DIMENSIONS = 1024;
+export type { EmbeddingConfig };
+export { describeEmbedding, getEmbeddingConfig };
+
+let openaiClient: { key: string | undefined; client: OpenAI } | undefined;
+let geminiClient: { key: string | undefined; client: OpenAI } | undefined;
+
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!openaiClient || openaiClient.key !== apiKey) {
+    openaiClient = { key: apiKey, client: new OpenAI({ apiKey }) };
+  }
+  return openaiClient.client;
+}
+
+function getGeminiClient(): OpenAI {
+  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+  if (!geminiClient || geminiClient.key !== apiKey) {
+    geminiClient = {
+      key: apiKey,
+      client: new OpenAI({
+        apiKey,
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      }),
+    };
+  }
+  return geminiClient.client;
+}
+
+function requireKey(provider: EmbeddingConfig["provider"]): void {
+  if (provider === "gemini" && !process.env.GOOGLE_GEMINI_API_KEY?.trim()) {
+    throw new Error(
+      "[embeddings] GOOGLE_GEMINI_API_KEY is missing for EMBEDDING_PROVIDER=gemini. " +
+        "Set GOOGLE_GEMINI_API_KEY or switch to EMBEDDING_PROVIDER=openai with OPENAI_API_KEY."
+    );
+  }
+  if (provider === "openai" && !process.env.OPENAI_API_KEY?.trim()) {
+    throw new Error(
+      "[embeddings] OPENAI_API_KEY is missing for EMBEDDING_PROVIDER=openai. " +
+        "Set OPENAI_API_KEY or switch to EMBEDDING_PROVIDER=gemini with GOOGLE_GEMINI_API_KEY."
+    );
+  }
+}
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
@@ -51,14 +111,17 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
  * Generate a single embedding vector (used for query-time search)
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const config = getEmbeddingConfig();
+  requireKey(config.provider);
+  const client = config.provider === "gemini" ? getGeminiClient() : getOpenAIClient();
   const response = await withRetry(
     () =>
-      openai.embeddings.create({
-        model: EMBEDDING_MODEL,
-        dimensions: EMBEDDING_DIMENSIONS,
+      client.embeddings.create({
+        model: config.model,
+        dimensions: config.dimensions,
         input: text.slice(0, 8000),
       }),
-    "generateEmbedding"
+    `generateEmbedding(${config.provider})`
   );
   return response.data[0].embedding;
 }
@@ -69,6 +132,9 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 export async function generateEmbeddingsBatch(
   texts: string[]
 ): Promise<number[][]> {
+  const config = getEmbeddingConfig();
+  requireKey(config.provider);
+  const client = config.provider === "gemini" ? getGeminiClient() : getOpenAIClient();
   const BATCH_SIZE = 100;
   const results: number[][] = [];
 
@@ -76,15 +142,89 @@ export async function generateEmbeddingsBatch(
     const batch = texts.slice(i, i + BATCH_SIZE).map((t) => t.slice(0, 8000));
     const response = await withRetry(
       () =>
-        openai.embeddings.create({
-          model: EMBEDDING_MODEL,
-          dimensions: EMBEDDING_DIMENSIONS,
+        client.embeddings.create({
+          model: config.model,
+          dimensions: config.dimensions,
           input: batch,
         }),
-      `generateEmbeddingsBatch[${i}-${i + batch.length}]`
+      `generateEmbeddingsBatch(${config.provider})[${i}-${i + batch.length}]`
     );
     results.push(...response.data.map((d) => d.embedding));
   }
 
   return results;
+}
+
+/** Minimal structural view of a stored vector's embedding origin tags. */
+export interface StoredEmbeddingTags {
+  embeddingProvider?: unknown;
+  embeddingModel?: unknown;
+  embeddingDimensions?: unknown;
+}
+
+function readTags(payload: StoredEmbeddingTags | null | undefined): EmbeddingConfig | undefined {
+  if (!payload) return undefined;
+  const { embeddingProvider, embeddingModel, embeddingDimensions } = payload;
+  if (
+    typeof embeddingProvider !== "string" ||
+    typeof embeddingModel !== "string" ||
+    typeof embeddingDimensions !== "number"
+  ) {
+    return undefined;
+  }
+  return {
+    provider: embeddingProvider as EmbeddingConfig["provider"],
+    model: embeddingModel,
+    dimensions: embeddingDimensions,
+  };
+}
+
+function sameConfig(a: EmbeddingConfig, b: EmbeddingConfig): boolean {
+  return a.provider === b.provider && a.model === b.model && a.dimensions === b.dimensions;
+}
+
+/**
+ * Verify stored vectors were embedded with the currently configured model.
+ * Throws a clear, actionable error on any mismatch — including legacy vectors
+ * that carry no provider/model tags (e.g. repos ingested with Gemini
+ * embeddings while queries now embed with OpenAI) — instead of returning
+ * meaningless cross-model neighbours. Such repositories must be re-ingested.
+ */
+export function assertEmbeddingConsistency(
+  repoId: string,
+  hits: Array<{ payload?: StoredEmbeddingTags | null }>,
+  current: EmbeddingConfig = getEmbeddingConfig()
+): void {
+  if (hits.length === 0) return;
+  const expected = describeEmbedding(current);
+  const legacy = hits.filter((h) => readTags(h.payload) === undefined);
+  const mismatched = new Map<string, number>();
+  for (const hit of hits) {
+    const stored = readTags(hit.payload);
+    if (stored && !sameConfig(stored, current)) {
+      const label = describeEmbedding(stored);
+      mismatched.set(label, (mismatched.get(label) ?? 0) + 1);
+    }
+  }
+  if (legacy.length === 0 && mismatched.size === 0) return;
+
+  const parts: string[] = [];
+  for (const [label, count] of mismatched) {
+    parts.push(
+      `${count} stored vector(s) use ${JSON.stringify(label)} but queries embed with ${JSON.stringify(expected)}`
+    );
+  }
+  if (legacy.length > 0) {
+    parts.push(
+      `${legacy.length} stored vector(s) predate embedding-model tracking (no provider/model metadata) ` +
+        `and may have been generated with a different model — ` +
+        `e.g. Gemini and OpenAI embeddings are mutually incompatible — ` +
+        `than the current query embedding ${JSON.stringify(expected)}`
+    );
+  }
+  throw new Error(
+    `[embeddings] Embedding model mismatch for repo ${JSON.stringify(repoId)}: ${parts.join("; ")}. ` +
+      `Vectors from different models live in incompatible vector spaces, so search results would be meaningless. ` +
+      `Re-ingest the repository (POST /api/search/ingest) with the current EMBEDDING_* configuration before searching.`
+  );
 }

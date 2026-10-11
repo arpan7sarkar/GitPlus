@@ -3,8 +3,11 @@
  * Feature: Hierarchical Semantic Code Search (Pinecone + Neon Postgres BM25 Keyword Search with RRF)
  *
  * Ingest builds a 4-tier hierarchy per repo — repo -> module -> file -> symbol —
- * and embeds every tier (text-embedding-3-large @ 1024 dims) into one Pinecone
- * index with `level` as a filterable metadata field. Hybrid search fuses
+ * and embeds every tier (explicit EMBEDDING_PROVIDER/MODEL/DIMENSIONS config,
+ * default OpenAI text-embedding-3-large @ 1024 dims) into one Pinecone
+ * index with `level` as a filterable metadata field. Every vector is tagged
+ * with its embedding origin so query time can reject a model mismatch (stale
+ * vectors from a different model need re-ingestion). Hybrid search fuses
  * Pinecone's dense results with Postgres sparse keyword results, then expands each
  * hit with its immediate parent's summary for extra context.
  *
@@ -17,7 +20,7 @@ import path from "path";
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { ensureIndex, upsertChunks, deleteByRepo, type NodeLevel, type NodePayload } from "../lib/pinecone.js";
-import { generateEmbeddingsBatch } from "../lib/embeddings.js";
+import { describeEmbedding, generateEmbeddingsBatch, getEmbeddingConfig } from "../lib/embeddings.js";
 import { chunkCodeFiles, detectCategory, hash, type FileNode, type SymbolChunk } from "../lib/chunker.js";
 import { summarizeFile, summarizeModule, summarizeRepo, mapWithConcurrency } from "../lib/summarize.js";
 import { retrieveForQuery } from "../lib/retrieval.js";
@@ -45,6 +48,12 @@ interface NodeRow {
   embeddingText: string;
   category: string | null;
   contentHash: string;
+  // Origin of the embedding stored for this node — written to both Pinecone
+  // metadata and the Postgres mirror so query time can reject a model mismatch
+  // instead of mixing incompatible vector spaces.
+  embeddingProvider: string;
+  embeddingModel: string;
+  embeddingDimensions: number;
 }
 
 function toPayload(row: NodeRow): NodePayload {
@@ -58,6 +67,9 @@ function toPayload(row: NodeRow): NodePayload {
     startLine: row.startLine || 0,
     endLine: row.endLine || 0,
     lineRange: row.startLine && row.endLine ? `${row.startLine}-${row.endLine}` : "",
+    embeddingProvider: row.embeddingProvider,
+    embeddingModel: row.embeddingModel,
+    embeddingDimensions: row.embeddingDimensions,
   };
 }
 
@@ -84,6 +96,12 @@ router.post("/ingest", async (req: Request, res: Response) => {
     console.log(`[search-ingest] Ingesting ${files.length} files for repoId: ${repoId}`);
 
     await ensureIndex();
+
+    // Resolve the explicit embedding configuration up front so a misconfigured
+    // env (bad EMBEDDING_PROVIDER, missing key) fails fast before any expensive
+    // summarization — and so every node below is tagged with the same origin.
+    const embeddingConfig = getEmbeddingConfig();
+    console.log(`[search-ingest] Embedding with ${describeEmbedding(embeddingConfig)}`);
 
     // Symbol-aware chunking (AST where supported, boundary-snapped fallback otherwise)
     const { fileNodes, symbolChunks } = await chunkCodeFiles(files, repoId);
@@ -155,6 +173,9 @@ router.post("/ingest", async (req: Request, res: Response) => {
       embeddingText: repoSummary,
       category: detectCategory(repoSummary),
       contentHash: hash(repoSummary),
+      embeddingProvider: embeddingConfig.provider,
+      embeddingModel: embeddingConfig.model,
+      embeddingDimensions: embeddingConfig.dimensions,
     });
 
     for (const { modulePath, summary } of moduleSummaries) {
@@ -176,6 +197,9 @@ router.post("/ingest", async (req: Request, res: Response) => {
         embeddingText: summary,
         category: detectCategory(summary),
         contentHash: hash(summary),
+        embeddingProvider: embeddingConfig.provider,
+        embeddingModel: embeddingConfig.model,
+        embeddingDimensions: embeddingConfig.dimensions,
       });
     }
 
@@ -199,6 +223,9 @@ router.post("/ingest", async (req: Request, res: Response) => {
         embeddingText: summary,
         category: detectCategory(summary),
         contentHash: hash(fileNode.content),
+        embeddingProvider: embeddingConfig.provider,
+        embeddingModel: embeddingConfig.model,
+        embeddingDimensions: embeddingConfig.dimensions,
       });
     }
 
@@ -221,10 +248,15 @@ router.post("/ingest", async (req: Request, res: Response) => {
         embeddingText: c.embeddingText,
         category: c.category,
         contentHash: c.contentHash,
+        embeddingProvider: embeddingConfig.provider,
+        embeddingModel: embeddingConfig.model,
+        embeddingDimensions: embeddingConfig.dimensions,
       });
     }
 
-    // 7. Embed every tier in one batch pass (text-embedding-3-large @ 1024 dims)
+    // 7. Embed every tier in one batch pass. Each vector is tagged with the
+    // embedding origin above (toPayload) so query time can reject a model
+    // mismatch instead of mixing incompatible vector spaces.
     const embeddings = await generateEmbeddingsBatch(nodes.map((n) => n.embeddingText));
 
     // Keep the old index intact until summaries and embeddings have succeeded.
@@ -244,7 +276,8 @@ router.post("/ingest", async (req: Request, res: Response) => {
 
     console.log(
       `[search-ingest] Indexed ${nodes.length} nodes for repoId: ${repoId} ` +
-        `(1 repo, ${moduleSummaries.length} modules, ${fileNodes.length} files, ${symbolChunks.length} symbols)`
+        `(1 repo, ${moduleSummaries.length} modules, ${fileNodes.length} files, ${symbolChunks.length} symbols) ` +
+        `with ${describeEmbedding(embeddingConfig)}`
     );
 
     // 10. If the requester is logged in, record this repo against their account
@@ -284,7 +317,15 @@ router.post("/ingest", async (req: Request, res: Response) => {
       }
     }
 
-    return res.json({ success: true, count: nodes.length });
+    return res.json({
+      success: true,
+      count: nodes.length,
+      embedding: {
+        provider: embeddingConfig.provider,
+        model: embeddingConfig.model,
+        dimensions: embeddingConfig.dimensions,
+      },
+    });
   } catch (err: any) {
     console.error("[search-ingest error]:", err);
     return res.status(500).json({ error: err.message || "Failed to ingest codebase chunks" });

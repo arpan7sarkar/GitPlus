@@ -10,11 +10,17 @@
  * so the LLM gets diverse, non-redundant chunks instead of several near-duplicate
  * hits from the same file crowding out everything else -> parent-context expansion
  * (small-to-big) for each surviving chunk.
+ *
+ * Embedding consistency: every stored vector is tagged with its origin model at
+ * ingest time, and the dense hits (plus any tagged Postgres mirror rows) are
+ * verified against the currently configured embedding model before fusion. A
+ * mismatch — e.g. a repo ingested with Gemini embeddings queried with OpenAI —
+ * throws a clear re-ingest error instead of returning meaningless neighbours.
  */
 
 import { prisma } from "./prisma.js";
 import { vectorSearch, type SearchHit, type NodeLevel } from "./pinecone.js";
-import { generateEmbedding } from "./embeddings.js";
+import { assertEmbeddingConsistency, generateEmbedding, getEmbeddingConfig } from "./embeddings.js";
 import { keywordSearch, reciprocalRankFusion } from "./hybridSearch.js";
 
 export interface RetrievedChunk {
@@ -141,9 +147,40 @@ export async function retrieveForQuery(
         summary: true,
         embeddingText: true,
         category: true,
+        embeddingProvider: true,
+        embeddingModel: true,
+        embeddingDimensions: true,
       },
     }),
   ]);
+
+  // Fail fast when the index holds vectors from a different embedding model
+  // than the query was embedded with (or legacy untagged vectors, e.g. repos
+  // ingested with Gemini embeddings while queries now use OpenAI) — fusing
+  // them would silently return meaningless neighbours. The Postgres check only
+  // looks at rows that actually carry origin tags: untagged mirror rows prove
+  // nothing on their own (keyword search needs no vectors), while the Pinecone
+  // check above governs untagged stored vectors.
+  const embeddingConfig = getEmbeddingConfig();
+  assertEmbeddingConsistency(repoId, denseResults, embeddingConfig);
+  assertEmbeddingConsistency(
+    repoId,
+    dbNodes
+      .map((n) => ({
+        payload: {
+          embeddingProvider: n.embeddingProvider,
+          embeddingModel: n.embeddingModel,
+          embeddingDimensions: n.embeddingDimensions,
+        },
+      }))
+      .filter(
+        (h) =>
+          h.payload.embeddingProvider != null ||
+          h.payload.embeddingModel != null ||
+          h.payload.embeddingDimensions != null
+      ),
+    embeddingConfig
+  );
 
   const dbNodeById = new Map(dbNodes.map((n) => [n.id, n]));
 

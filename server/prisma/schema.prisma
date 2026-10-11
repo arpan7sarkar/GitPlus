@@ -187,6 +187,14 @@ model Node {
   summary          String?   // LLM-generated summary, file/module/repo level
   embeddingText    String    @default("") @map("embedding_text") // what was actually embedded + what keyword search runs against
 
+  // Origin of the vector stored in Pinecone for this node. Written at ingest
+  // time; query time rejects a mismatch with the configured embedding model
+  // instead of mixing incompatible vector spaces. Null = ingested before
+  // model tracking (re-ingest to tag these rows).
+  embeddingProvider   String? @map("embedding_provider")
+  embeddingModel      String? @map("embedding_model")
+  embeddingDimensions Int?    @map("embedding_dimensions")
+
   category         String?
   contentHash      String    @default("") @map("content_hash")
   createdAt        DateTime  @default(now()) @map("created_at")

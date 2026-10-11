@@ -15,7 +15,7 @@ const BATCH_BYTES = 1_900_000;
 
 export type NodeLevel = "repo" | "module" | "file" | "symbol";
 
-export interface NodePayload extends RecordMetadata {
+export type NodePayload = RecordMetadata & {
   repoId: string;
   level: NodeLevel;
   filePath: string;
@@ -25,7 +25,16 @@ export interface NodePayload extends RecordMetadata {
   startLine: number;
   endLine: number;
   lineRange: string;
-}
+  // Embedding origin tags, written at ingest time (see embeddings.ts).
+  // Optional so vectors stored before model tracking still typecheck; query
+  // time treats untagged records as legacy and reports a model mismatch
+  // directing the operator to re-ingest instead of mixing vector spaces.
+  // (A `type` intersection rather than an `interface extends`, because the
+  // SDK's RecordMetadata index signature has no `undefined` member.)
+  embeddingProvider?: string;
+  embeddingModel?: string;
+  embeddingDimensions?: number;
+};
 
 export interface NodePoint {
   id: string;
