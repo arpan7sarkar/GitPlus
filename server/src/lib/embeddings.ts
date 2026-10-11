@@ -42,7 +42,6 @@ export type { EmbeddingConfig };
 export { describeEmbedding, getEmbeddingConfig };
 
 let openaiClient: { key: string | undefined; client: OpenAI } | undefined;
-let geminiClient: { key: string | undefined; client: OpenAI } | undefined;
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -50,20 +49,6 @@ function getOpenAIClient(): OpenAI {
     openaiClient = { key: apiKey, client: new OpenAI({ apiKey }) };
   }
   return openaiClient.client;
-}
-
-function getGeminiClient(): OpenAI {
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-  if (!geminiClient || geminiClient.key !== apiKey) {
-    geminiClient = {
-      key: apiKey,
-      client: new OpenAI({
-        apiKey,
-        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-      }),
-    };
-  }
-  return geminiClient.client;
 }
 
 function requireKey(provider: EmbeddingConfig["provider"]): void {
@@ -107,23 +92,82 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   throw lastErr;
 }
 
+function validateEmbeddings(vectors: unknown, count: number, config: EmbeddingConfig): number[][] {
+  if (!Array.isArray(vectors) || vectors.length !== count) {
+    throw new Error(
+      `[embeddings] ${config.provider} returned an invalid embedding count: expected ${count}, ` +
+        `received ${Array.isArray(vectors) ? vectors.length : "no embedding array"}.`
+    );
+  }
+  for (const vector of vectors) {
+    if (!Array.isArray(vector)) {
+      throw new Error(`[embeddings] ${config.provider} returned an invalid embedding vector.`);
+    }
+    if (vector.length !== config.dimensions) {
+      throw new Error(
+        `[embeddings] ${config.provider} embedding dimension mismatch: expected ${config.dimensions}, ` +
+          `received ${vector.length}. Check the embedding model and its output dimensionality.`
+      );
+    }
+    if (vector.some((value: unknown) => typeof value !== "number" || !Number.isFinite(value))) {
+      throw new Error(`[embeddings] ${config.provider} returned an embedding with non-finite or non-numeric values.`);
+    }
+  }
+  return vectors as number[][];
+}
+
+async function generateGeminiEmbeddings(texts: string[], config: EmbeddingConfig): Promise<number[][]> {
+  const model = config.model.replace(/^models\//, "");
+  return withRetry(async () => {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:batchEmbedContents`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": process.env.GOOGLE_GEMINI_API_KEY!,
+        },
+        body: JSON.stringify({
+          requests: texts.map((text) => ({
+            model: `models/${model}`,
+            content: { parts: [{ text }] },
+            outputDimensionality: config.dimensions,
+          })),
+        }),
+      }
+    );
+    if (!response.ok) {
+      throw Object.assign(
+        new Error(`[embeddings] Gemini embedding request failed (HTTP ${response.status}).`),
+        { status: response.status }
+      );
+    }
+    const data = await response.json() as { embeddings?: Array<{ values?: unknown }> };
+    const vectors = Array.isArray(data?.embeddings) ? data.embeddings.map((item) => item?.values) : undefined;
+    return validateEmbeddings(vectors, texts.length, config);
+  }, "generateGeminiEmbeddings");
+}
+
 /**
  * Generate a single embedding vector (used for query-time search)
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   const config = getEmbeddingConfig();
   requireKey(config.provider);
-  const client = config.provider === "gemini" ? getGeminiClient() : getOpenAIClient();
+  const input = text.slice(0, 8000);
+  if (config.provider === "gemini") {
+    return (await generateGeminiEmbeddings([input], config))[0];
+  }
   const response = await withRetry(
     () =>
-      client.embeddings.create({
+      getOpenAIClient().embeddings.create({
         model: config.model,
         dimensions: config.dimensions,
-        input: text.slice(0, 8000),
+        input,
       }),
     `generateEmbedding(${config.provider})`
   );
-  return response.data[0].embedding;
+  return validateEmbeddings(response.data.map((item) => item.embedding), 1, config)[0];
 }
 
 /**
@@ -134,22 +178,25 @@ export async function generateEmbeddingsBatch(
 ): Promise<number[][]> {
   const config = getEmbeddingConfig();
   requireKey(config.provider);
-  const client = config.provider === "gemini" ? getGeminiClient() : getOpenAIClient();
   const BATCH_SIZE = 100;
   const results: number[][] = [];
 
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE).map((t) => t.slice(0, 8000));
+    if (config.provider === "gemini") {
+      results.push(...await generateGeminiEmbeddings(batch, config));
+      continue;
+    }
     const response = await withRetry(
       () =>
-        client.embeddings.create({
+        getOpenAIClient().embeddings.create({
           model: config.model,
           dimensions: config.dimensions,
           input: batch,
         }),
       `generateEmbeddingsBatch(${config.provider})[${i}-${i + batch.length}]`
     );
-    results.push(...response.data.map((d) => d.embedding));
+    results.push(...validateEmbeddings(response.data.map((item) => item.embedding), batch.length, config));
   }
 
   return results;

@@ -19,7 +19,7 @@
 import path from "path";
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
-import { ensureIndex, upsertChunks, deleteByRepo, type NodeLevel, type NodePayload } from "../lib/pinecone.js";
+import { ensureIndex, upsertChunks, deleteByRepo, PINECONE_DIMENSION, type NodeLevel, type NodePayload } from "../lib/pinecone.js";
 import { describeEmbedding, generateEmbeddingsBatch, getEmbeddingConfig } from "../lib/embeddings.js";
 import { chunkCodeFiles, detectCategory, hash, type FileNode, type SymbolChunk } from "../lib/chunker.js";
 import { summarizeFile, summarizeModule, summarizeRepo, mapWithConcurrency } from "../lib/summarize.js";
@@ -95,12 +95,14 @@ router.post("/ingest", async (req: Request, res: Response) => {
 
     console.log(`[search-ingest] Ingesting ${files.length} files for repoId: ${repoId}`);
 
-    await ensureIndex();
-
-    // Resolve the explicit embedding configuration up front so a misconfigured
-    // env (bad EMBEDDING_PROVIDER, missing key) fails fast before any expensive
-    // summarization — and so every node below is tagged with the same origin.
     const embeddingConfig = getEmbeddingConfig();
+    if (embeddingConfig.dimensions !== PINECONE_DIMENSION) {
+      throw new Error(
+        `[embeddings] EMBEDDING_DIMENSIONS=${embeddingConfig.dimensions} is incompatible with Pinecone. ` +
+          `Set EMBEDDING_DIMENSIONS=${PINECONE_DIMENSION} to match the index.`
+      );
+    }
+    await ensureIndex();
     console.log(`[search-ingest] Embedding with ${describeEmbedding(embeddingConfig)}`);
 
     // Symbol-aware chunking (AST where supported, boundary-snapped fallback otherwise)

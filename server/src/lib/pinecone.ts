@@ -7,7 +7,7 @@ import {
   type RecordMetadata,
 } from "@pinecone-database/pinecone";
 
-const DIMENSION = 1024;
+export const PINECONE_DIMENSION = 1024;
 const BATCH_SIZE = 100;
 // Leave headroom below Pinecone's 2 MB / 1000-record request limits.
 const BATCH_BYTES = 1_900_000;
@@ -145,13 +145,13 @@ function validateIndex(description: IndexModel, state: Connection): void {
   });
   if (
     !dense || !("type" in dense) || dense.type !== "dense_vector" ||
-    dense.dimension !== DIMENSION || dense.metric !== "cosine" || incompatibleField
+    dense.dimension !== PINECONE_DIMENSION || dense.metric !== "cosine" || incompatibleField
   ) {
     const summary = Object.entries(fields).slice(0, 10)
       .map(([name, field]) => `${safeText(name, state.apiKey)}=${describeField(field, state.apiKey)}`)
       .join(", ") || "missing/empty schema";
     throw new Error(
-      `[pinecone] Incompatible index: expected a legacy vectors-API schema with _values dense_vector, dimension ${DIMENSION} and metric cosine; received ${summary}. ` +
+      `[pinecone] Incompatible index: expected a legacy vectors-API schema with _values dense_vector, dimension ${PINECONE_DIMENSION} and metric cosine; received ${summary}. ` +
       "Select or create a separate compatible dense index and set PINECONE_INDEX_NAME and PINECONE_INDEX_HOST. GitPlus does not provision indexes or switch embedding models."
     );
   }
@@ -187,8 +187,8 @@ async function getValidatedIndex(): Promise<{ index: Index<NodePayload>; namespa
 }
 
 function validateVector(vector: number[]): void {
-  if (vector.length !== DIMENSION || vector.some((value) => !Number.isFinite(value))) {
-    throw new Error(`[pinecone] Expected a ${DIMENSION}-dimensional vector of finite numbers.`);
+  if (vector.length !== PINECONE_DIMENSION || vector.some((value) => !Number.isFinite(value))) {
+    throw new Error(`[pinecone] Expected a ${PINECONE_DIMENSION}-dimensional vector of finite numbers.`);
   }
 }
 
