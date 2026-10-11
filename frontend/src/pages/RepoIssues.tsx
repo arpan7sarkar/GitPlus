@@ -107,25 +107,27 @@ Be precise and reference actual files from the codebase.`;
         name={repo.name}
         active="issues"
         actions={
-          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-7 px-3 text-xs rounded-full">
+          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-11 px-3 text-sm rounded-md sm:h-9">
             <MessageSquare className="h-3 w-3 mr-1" aria-hidden="true" /> Chat
           </Button>
         }
       />
 
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        <h1 className="mb-4 text-2xl font-semibold">Issues</h1>
         {/* Filter tabs */}
         <div className="flex items-center gap-1 mb-4">
           {(["open", "closed"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
-              className={`px-3 py-1.5 text-xs rounded transition-colors ${filter === s
-                  ? "bg-card border border-border text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
+              aria-pressed={filter === s}
+              className={`min-h-11 px-3 py-2 text-sm rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9 ${filter === s
+                  ? "bg-accent border border-border text-foreground font-medium"
+                  : "text-secondary-foreground hover:text-foreground hover:bg-muted"
                 }`}
             >
-              <CircleDot className={`h-3 w-3 inline mr-1.5 ${s === "open" ? "text-green-500" : "text-muted-foreground"}`} />
+              <CircleDot className={`h-3 w-3 inline mr-1.5 ${s === "open" ? "text-success" : "text-muted-foreground"}`} />
               {s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
           ))}
@@ -147,10 +149,10 @@ Be precise and reference actual files from the codebase.`;
                 <AlertCircle className="h-5 w-5 text-destructive" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-foreground mb-1">Unable to Load Issues</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-3">{error}</p>
+                <h3 className="text-lg font-semibold text-foreground mb-1">Unable to Load Issues</h3>
+                <p className="break-words text-sm text-secondary-foreground leading-relaxed mb-3">{error}</p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => loadIssues()} className="h-7 px-3 text-[11px]">
+                  <Button variant="outline" size="sm" onClick={() => loadIssues()} className="h-11 px-3 text-sm sm:h-9">
                     <Loader2 className={`h-3 w-3 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Retry
                   </Button>
                 </div>
@@ -175,39 +177,35 @@ Be precise and reference actual files from the codebase.`;
                   className="p-3 hover:bg-accent/20 transition-colors"
                 >
                   <div className="flex items-start gap-3">
-                    <CircleDot className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${issue.state === "open" ? "text-green-500" : "text-muted-foreground"
+                    <CircleDot className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${issue.state === "open" ? "text-success" : "text-muted-foreground"
                       }`} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1 basis-48">
                           <button
                             onClick={() => setSelectedIssue(selectedIssue?.number === issue.number ? null : issue)}
-                            className="text-sm font-medium text-foreground hover:text-primary transition-colors text-left"
+                            aria-expanded={selectedIssue?.number === issue.number}
+                            className="min-h-11 w-full [overflow-wrap:anywhere] rounded-sm py-1 text-sm font-medium text-foreground hover:text-foreground transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
                           >
                             {issue.title}
                           </button>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               #{issue.number}
                             </span>
                             {issue.labels.map((label) => (
                               <span
                                 key={label.name}
-                                className="text-[10px] px-1.5 py-0.5 rounded-full border border-border"
-                                style={{
-                                  backgroundColor: `#${label.color}20`,
-                                  color: `#${label.color}`,
-                                  borderColor: `#${label.color}40`,
-                                }}
+                                className="max-w-full break-words text-xs text-secondary-foreground bg-muted px-2 py-1 rounded-md border border-border"
                               >
                                 {label.name}
                               </span>
                             ))}
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                               <Clock className="h-2.5 w-2.5" /> {timeAgo(issue.updated_at)}
                             </span>
                             {issue.comments > 0 && (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                                 <MessageSquare className="h-2.5 w-2.5" /> {issue.comments}
                               </span>
                             )}
@@ -217,7 +215,7 @@ Be precise and reference actual files from the codebase.`;
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 px-2 text-[10px]"
+                            className="h-11 px-3 text-sm sm:h-9"
                             onClick={() => solveIssue(issue)}
                           >
                             <Sparkles className="h-3 w-3 mr-1" /> Solve
@@ -226,7 +224,8 @@ Be precise and reference actual files from the codebase.`;
                             href={issue.html_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label={`Open issue #${issue.number} on GitHub`}
+                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-secondary-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9 sm:w-9"
                           >
                             <ExternalLink className="h-3 w-3" />
                           </a>
@@ -242,7 +241,7 @@ Be precise and reference actual files from the codebase.`;
                             exit={{ height: 0, opacity: 0 }}
                             className="overflow-hidden"
                           >
-                            <div className="mt-3 p-3 rounded bg-muted/50 text-xs text-secondary-foreground leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">
+                            <div className="mt-3 p-3 rounded bg-muted/50 text-sm text-secondary-foreground leading-relaxed whitespace-pre-wrap break-words max-h-40 overflow-y-auto">
                               {issue.body || "No description provided."}
                             </div>
                           </motion.div>
@@ -255,7 +254,7 @@ Be precise and reference actual files from the codebase.`;
             )}
           </div>
         )}
-      </div>
+      </main>
 
       {/* AI Solution Panel */}
       <AnimatePresence>
@@ -268,11 +267,11 @@ Be precise and reference actual files from the codebase.`;
             className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background shadow-lg"
             style={{ maxHeight: "50vh" }}
           >
-            <div className="max-w-5xl mx-auto px-6">
-              <div className="flex items-center justify-between py-2 border-b border-border">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs font-medium text-foreground">
+                  <span className="text-sm font-medium text-foreground">
                     Solution for #{selectedIssue.number}
                   </span>
                   {aiLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
@@ -281,7 +280,7 @@ Be precise and reference actual files from the codebase.`;
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-[10px]"
+                    className="h-11 px-3 text-sm sm:h-9"
                     onClick={() =>
                       navigate(`/repo/${repoId}/chat`, {
                         state: { initialQuestion: `Help me solve issue #${selectedIssue.number}: ${selectedIssue.title}\n\n${selectedIssue.body}` },
@@ -292,13 +291,14 @@ Be precise and reference actual files from the codebase.`;
                   </Button>
                   <button
                     onClick={() => { setAiResponse(""); setSelectedIssue(null); }}
-                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    aria-label="Close issue solution"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-secondary-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9 sm:w-9"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
-              <div className="py-3 overflow-y-auto text-xs text-secondary-foreground leading-relaxed whitespace-pre-wrap font-mono" style={{ maxHeight: "calc(50vh - 40px)" }}>
+              <div className="py-3 overflow-y-auto text-sm text-secondary-foreground leading-relaxed whitespace-pre-wrap break-words" style={{ maxHeight: "calc(50vh - 40px)" }}>
                 {aiResponse || "Analyzing issue..."}
               </div>
             </div>

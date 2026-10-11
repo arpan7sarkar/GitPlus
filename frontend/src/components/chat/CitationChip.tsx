@@ -11,11 +11,14 @@ const CitationChip = ({ citation, onClick }: CitationChipProps) => {
 
   return (
     <button
+      type="button"
       onClick={() => onClick(citation)}
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-primary border border-border hover:bg-accent/30 transition-colors"
+      aria-label={`Open ${citation.filePath}, lines ${citation.startLine} to ${citation.endLine}`}
+      title={citation.filePath}
+      className="inline-flex min-h-10 max-w-full items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-mono bg-muted text-secondary-foreground border border-border hover:bg-accent hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
     >
-      <FileCode className="h-2.5 w-2.5" />
-      {fileName}:{citation.startLine}–{citation.endLine}
+      <FileCode className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="min-w-0 break-all text-left">{fileName}:{citation.startLine}–{citation.endLine}</span>
     </button>
   );
 };

@@ -3,6 +3,7 @@ import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
 import { AnimatePresence } from "framer-motion";
 import type { FileTreeNode } from "@/lib/mock-data";
 import NodeContextMenu from "./NodeContextMenu";
+import { useTheme } from "@/hooks/use-theme";
 
 interface DependencyGraphProps {
   fileTree: FileTreeNode[];
@@ -39,9 +40,6 @@ const FOLDER_STROKE = "hsl(210, 70%, 65%)";
 const FOLDER_STROKE_COLLAPSED = "hsl(260, 55%, 65%)";
 const FILE_FILL = "hsl(220, 15%, 50%)";
 const FILE_STROKE = "hsl(220, 15%, 62%)";
-const LINK_COLOR = "hsl(220, 10%, 25%)";
-const LABEL_FOLDER = "hsl(220, 12%, 78%)";
-const LABEL_FILE = "hsl(220, 12%, 58%)";
 
 /* ── Physics constants ── */
 const CHARGE_STRENGTH = -220;
@@ -78,6 +76,15 @@ function getInitialPosition(depth: number, index: number, total: number): { x: n
 }
 
 const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: DependencyGraphProps) => {
+  const { theme } = useTheme();
+  const palette = useMemo(() => {
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      folderLabel: `hsl(${styles.getPropertyValue("--secondary-foreground")})`,
+      fileLabel: `hsl(${styles.getPropertyValue("--muted-foreground")})`,
+      link: `hsl(${styles.getPropertyValue("--border")})`,
+    };
+  }, [theme]);
   const fgRef = useRef<ForceGraphMethods>();
   const containerRef = useRef<HTMLDivElement>(null);
   // Store stable node positions between renders to avoid overlap on expand/collapse
@@ -99,24 +106,6 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
       setInitialized(true);
     }
   }, [fileTree, initialized]);
-
-  const toggleCollapse = useCallback((folderId: string) => {
-    // Snapshot current positions before toggling so nodes don't jump
-    if (fgRef.current) {
-      const graphData = fgRef.current.graphData() as { nodes: GraphNode[] };
-      graphData.nodes.forEach((n) => {
-        if (n.x !== undefined && n.y !== undefined) {
-          positionCache.current[n.id] = { x: n.x, y: n.y };
-        }
-      });
-    }
-    setCollapsedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(folderId)) next.delete(folderId);
-      else next.add(folderId);
-      return next;
-    });
-  }, []);
 
   /* ── Observe container size ── */
   useEffect(() => {
@@ -159,7 +148,7 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
 
         // Restore cached position (preserves layout across collapse/expand)
         // or compute a stable initial spread position to reduce overlap
-        const cached = positionCache.current[node.id];
+        const cached = positionCache.current[node.path];
         const initPos = cached ?? getInitialPosition(depth, index, total);
 
         nodes.push({
@@ -189,6 +178,20 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
     traverse(fileTree);
     return { nodes, links };
   }, [fileTree, collapsedFolders, initialized]);
+
+  const toggleCollapse = useCallback((folderId: string) => {
+    graphData.nodes.forEach((node) => {
+      if (node.x !== undefined && node.y !== undefined) {
+        positionCache.current[node.id] = { x: node.x, y: node.y };
+      }
+    });
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
+    });
+  }, [graphData.nodes]);
 
   /* ── Canvas Painter ── */
   const drawNode = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -238,9 +241,9 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
       }
 
       // Title below
-      const fontSize = Math.max(8, 10 / Math.max(1, globalScale * 0.5));
-      ctx.font = `600 ${fontSize}px sans-serif`;
-      ctx.fillStyle = LABEL_FOLDER;
+      const fontSize = 12 / Math.max(globalScale, 0.01);
+      ctx.font = `600 ${fontSize}px "Geist Sans", sans-serif`;
+      ctx.fillStyle = palette.folderLabel;
       ctx.textAlign = "center";
       ctx.fillText(label, node.x!, node.y! + size / 2 + fontSize);
 
@@ -256,13 +259,14 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
       ctx.stroke();
 
       // Title right
-      const fontSize = Math.max(7, 8 / Math.max(1, globalScale * 0.5));
-      ctx.font = `400 ${fontSize}px monospace`;
-      ctx.fillStyle = LABEL_FILE;
+      const fontSize = 12 / Math.max(globalScale, 0.01);
+      ctx.font = `400 ${fontSize}px "Geist Mono", monospace`;
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = palette.fileLabel;
       ctx.textAlign = "left";
       ctx.fillText(label, node.x! + 6, node.y! + 2);
     }
-  }, [collapsedFolders]);
+  }, [collapsedFolders, palette]);
 
   /* ── Interaction ── */
   const handleNodeClick = useCallback((node: GraphNode, event: MouseEvent) => {
@@ -328,19 +332,15 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
     if (graphData.nodes.length === 0) return;
     // After 1.5s allow nodes to settle freely (remove fx/fy pins from restored nodes)
     const timer = setTimeout(() => {
-      if (fgRef.current) {
-        const data = fgRef.current.graphData() as { nodes: GraphNode[] };
-        data.nodes.forEach((n) => {
-          // Only unpin nodes that weren't manually dragged
-          if (n.fx !== null && !n._pinnedX) {
-            n.fx = null;
-            n.fy = null;
-          }
-        });
-      }
+      graphData.nodes.forEach((node) => {
+        if (node.fx !== null && node._pinnedX === undefined) {
+          node.fx = null;
+          node.fy = null;
+        }
+      });
     }, 1500);
     return () => clearTimeout(timer);
-  }, [graphData.nodes.length]);
+  }, [graphData.nodes]);
 
   return (
     <div
@@ -349,7 +349,7 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
       onClick={() => setContextMenu(null)}
     >
       {/* Legend */}
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-3 px-3 py-1.5 rounded-md bg-card/80 backdrop-blur-sm border border-border/50 text-[10px] text-muted-foreground">
+      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 rounded-md bg-card border border-border text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded" style={{ background: FOLDER_FILL }} />
           Folder
@@ -362,7 +362,7 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
           <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: FILE_FILL }} />
           File
         </span>
-        <span className="opacity-60">Double-click folder to collapse/expand</span>
+        <span>Double-click folder to collapse/expand</span>
       </div>
 
       {dimensions.width > 20 && initialized && (
@@ -374,7 +374,7 @@ const DependencyGraph = ({ fileTree, expanded, onShowDetails, onExplain }: Depen
           nodeLabel="name"
           nodeCanvasObject={drawNode}
           nodeCanvasObjectMode={() => "replace"}
-          linkColor={() => LINK_COLOR}
+          linkColor={() => palette.link}
           linkWidth={1}
           linkDirectionalArrowLength={3}
           linkDirectionalArrowRelPos={1}

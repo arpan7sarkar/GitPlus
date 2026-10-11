@@ -1,3 +1,5 @@
+import type { RepoMeta as IndexedRepoMeta, FileTreeNode as IndexedFileTreeNode } from "@/lib/mock-data";
+
 export interface FileTreeNode {
   name: string;
   path: string;
@@ -22,8 +24,8 @@ export interface RepoMeta {
 
 export interface IndexedRepo {
   repoId: string;
-  meta: RepoMeta;
-  fileTree: FileTreeNode[];
+  meta: IndexedRepoMeta & { forks: number };
+  fileTree: IndexedFileTreeNode[];
   fileContents: { path: string; content: string; size: number }[];
   repoContext: string;
   totalFiles: number;

@@ -133,9 +133,9 @@ const RepoDashboard = () => {
           </main>
         ) : loadError ? (
           <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-2xl space-y-4 px-4 py-8 sm:px-6">
-            <h1 className="text-2xl font-semibold">Couldn’t load this repository</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Couldn’t load this repository</h1>
             <p role="alert" className="break-words text-sm text-destructive">{loadError}</p>
-            <p className="text-sm text-muted-foreground">For private repositories, reconnect from the homepage with GitHub access or a personal access token.</p>
+            <p className="text-sm text-secondary-foreground">For private repositories, reconnect from the homepage with GitHub access or a personal access token.</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => setRetryCount((count) => count + 1)}>Try again</Button>
               <Button onClick={() => navigate(`/${workspaceSearch}`)}>Connect a repository</Button>
@@ -147,50 +147,50 @@ const RepoDashboard = () => {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <h1 className="break-words text-2xl font-semibold">{repo.name}</h1>
-                {repo.description && <p className="mt-2 max-w-3xl break-words text-sm leading-relaxed text-muted-foreground">{repo.description}</p>}
+                <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground">{repo.name}</h1>
+                {repo.description && <p className="mt-2 max-w-3xl break-words text-sm leading-relaxed text-secondary-foreground">{repo.description}</p>}
               </div>
               <Button variant="outline" onClick={() => openInStackBlitz(repo.name, fileContents)} disabled={!fileContents.length} className="min-h-10 gap-2">
                 <Terminal className="h-4 w-4" aria-hidden="true" /> Open in IDE
               </Button>
             </div>
 
-            <div className="flex flex-wrap gap-2 text-sm">
-              <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2"><FileCode className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{fileContents.length.toLocaleString()} loaded files</span>
-              {repo.language && <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2"><Code2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{repo.language}</span>}
-              {(overview?.framework || repo.framework) && <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2"><Layers className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{overview?.framework || repo.framework}</span>}
-              {overview?.complexity && <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2"><AlertTriangle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />AI complexity estimate: {overview.complexity}</span>}
+            <div className="flex flex-wrap gap-2 text-[13px] text-muted-foreground">
+              <span className="inline-flex max-w-full items-center gap-2 break-words rounded-md border border-border bg-card px-3 py-2"><FileCode className="h-4 w-4 text-secondary-foreground" aria-hidden="true" />{fileContents.length.toLocaleString()} loaded files</span>
+              {repo.language && <span className="inline-flex max-w-full items-center gap-2 break-words rounded-md border border-border bg-card px-3 py-2"><Code2 className="h-4 w-4 text-secondary-foreground" aria-hidden="true" />{repo.language}</span>}
+              {(overview?.framework || repo.framework) && <span className="inline-flex max-w-full items-center gap-2 break-words rounded-md border border-border bg-card px-3 py-2"><Layers className="h-4 w-4 text-secondary-foreground" aria-hidden="true" />{overview?.framework || repo.framework}</span>}
+              {overview?.complexity && <span className="inline-flex max-w-full items-center gap-2 break-words rounded-md border border-border bg-card px-3 py-2"><AlertTriangle className="h-4 w-4 text-secondary-foreground" aria-hidden="true" />AI complexity estimate: {overview.complexity}</span>}
             </div>
 
             {indexMode === "on-demand" && (
               <div className="rounded-lg border border-border bg-muted/50 p-4">
-                <h2 className="font-medium">On-demand repository access</h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{totalSourceFiles.toLocaleString()} source files were identified; {unfetchedFiles.length.toLocaleString()} have not been loaded. Open a file to fetch its content. Questions can only verify source that is available to the model.</p>
+                <h2 className="text-lg font-medium text-foreground">On-demand repository access</h2>
+                <p className="mt-1 text-sm leading-relaxed text-secondary-foreground">{totalSourceFiles.toLocaleString()} source files were identified; {unfetchedFiles.length.toLocaleString()} have not been loaded. Open a file to fetch its content. Questions can only verify source that is available to the model.</p>
               </div>
             )}
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <section className="min-w-0 rounded-lg border border-border bg-card p-5" aria-labelledby="architecture-heading">
-                <h2 id="architecture-heading" className="flex items-center gap-2 text-base font-semibold"><Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />Architecture overview</h2>
-                <p className="mb-4 mt-1 text-sm text-muted-foreground">AI-generated notes. Verify claims against the source.</p>
-                {overviewLoading ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Generating overview…</p> : overviewError ? (
+                <h2 id="architecture-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground"><Sparkles className="h-4 w-4 shrink-0 text-secondary-foreground" aria-hidden="true" />Architecture overview</h2>
+                <p className="mb-4 mt-1 text-sm text-secondary-foreground">AI-generated notes. Verify claims against the source.</p>
+                {overviewLoading ? <p role="status" className="flex items-center gap-2 text-sm text-secondary-foreground"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />Generating overview…</p> : overviewError ? (
                   <div className="space-y-3"><p role="alert" className="break-words text-sm text-destructive">{overviewError}</p><Button variant="outline" onClick={() => setOverviewRetry((count) => count + 1)} className="min-h-10 gap-2"><RefreshCw className="h-4 w-4" aria-hidden="true" />Retry overview</Button></div>
-                ) : overview?.narrative ? <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{overview.narrative}</p> : <p className="text-sm text-muted-foreground">No overview is available. Loaded files and GitHub activity remain accessible.</p>}
+                ) : overview?.narrative ? <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-secondary-foreground">{overview.narrative}</p> : <p className="text-sm text-secondary-foreground">No overview is available. Loaded files and GitHub activity remain accessible.</p>}
               </section>
               <section className="min-w-0 rounded-lg border border-border bg-card p-5" aria-labelledby="key-files-heading">
-                <h2 id="key-files-heading" className="flex items-center gap-2 text-base font-semibold"><FileCode className="h-4 w-4 text-primary" aria-hidden="true" />Key files</h2>
-                <p className="mb-3 mt-1 text-sm text-muted-foreground">Selected by the overview model.</p>
-                {keyFiles.length ? <ul className="space-y-1">{keyFiles.map((path) => <li key={path}><button className="min-h-10 w-full break-all rounded-md px-2 py-2 text-left font-mono text-sm hover:bg-muted" onClick={() => askQuestion(`Explain the file: ${path}`)}>{path}</button></li>)}</ul> : <p className="text-sm text-muted-foreground">{overviewLoading ? "Waiting for the overview…" : "No key files were suggested."}</p>}
+                <h2 id="key-files-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground"><FileCode className="h-4 w-4 shrink-0 text-secondary-foreground" aria-hidden="true" />Key files</h2>
+                <p className="mb-3 mt-1 text-sm text-secondary-foreground">Selected by the overview model.</p>
+                {keyFiles.length ? <ul className="space-y-1">{keyFiles.map((path) => <li key={path}><button className="min-h-11 w-full break-all rounded-md px-2 py-2 text-left font-mono text-[13px] text-secondary-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-10" onClick={() => askQuestion(`Explain the file: ${path}`)}>{path}</button></li>)}</ul> : <p className="text-sm text-secondary-foreground">{overviewLoading ? "Waiting for the overview…" : "No key files were suggested."}</p>}
               </section>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <section className="min-w-0 rounded-lg border border-border bg-card p-4 sm:p-5" aria-labelledby="file-structure-heading">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 id="file-structure-heading" className="flex items-center gap-2 text-base font-semibold"><Network className="h-4 w-4 text-primary" aria-hidden="true" />File structure</h2>
+                  <h2 id="file-structure-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground"><Network className="h-4 w-4 shrink-0 text-secondary-foreground" aria-hidden="true" />File structure</h2>
                   <Button variant="ghost" onClick={() => setGraphExpanded((expanded) => !expanded)} aria-expanded={graphExpanded} className="min-h-10">{graphExpanded ? "Collapse graph" : "Expand graph"}</Button>
                 </div>
-                <p className="mb-3 text-sm text-muted-foreground">Folder-to-file relationships, not an import dependency map.</p>
+                <p className="mb-3 text-sm text-secondary-foreground">Folder-to-file relationships, not an import dependency map.</p>
                 <div style={{ height: graphExpanded ? 560 : compact ? 320 : 380 }}>
                   <DependencyGraph key={workspace.repoId} fileTree={fileTree} expanded={graphExpanded}
                     onShowDetails={(path) => askQuestion(`Show me the details of: ${path} — what does it do, what are its exports, and how is it used?`)}
@@ -198,23 +198,23 @@ const RepoDashboard = () => {
                 </div>
               </section>
               <section className="min-w-0 rounded-lg border border-border bg-card p-5" aria-labelledby="dependencies-heading">
-                <h2 id="dependencies-heading" className="flex items-center gap-2 text-base font-semibold"><Package className="h-4 w-4 text-primary" aria-hidden="true" />Dependencies</h2>
-                <p className="mb-3 mt-1 text-sm text-muted-foreground">Reported by the overview model.</p>
-                {dependencies.length ? <ul className="flex flex-wrap gap-2">{dependencies.map((dependency) => <li key={dependency} className="break-all rounded-md border border-border bg-muted px-2.5 py-1.5 font-mono text-sm">{dependency}</li>)}</ul> : <p className="text-sm text-muted-foreground">{overviewLoading ? "Waiting for the overview…" : "No dependencies were listed. Check the repository manifests."}</p>}
+                <h2 id="dependencies-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground"><Package className="h-4 w-4 shrink-0 text-secondary-foreground" aria-hidden="true" />Dependencies</h2>
+                <p className="mb-3 mt-1 text-sm text-secondary-foreground">Reported by the overview model.</p>
+                {dependencies.length ? <ul className="flex flex-wrap gap-2">{dependencies.map((dependency) => <li key={dependency} className="max-w-full break-all rounded-md border border-border bg-muted px-2.5 py-1.5 font-mono text-[13px] text-secondary-foreground">{dependency}</li>)}</ul> : <p className="text-sm text-secondary-foreground">{overviewLoading ? "Waiting for the overview…" : "No dependencies were listed. Check the repository manifests."}</p>}
               </section>
             </div>
 
             <section className="rounded-lg border border-border bg-card p-5" aria-labelledby="questions-heading">
-              <h2 id="questions-heading" className="flex items-center gap-2 text-base font-semibold"><MessageSquare className="h-4 w-4 text-primary" aria-hidden="true" />Questions to explore</h2>
-              {questions.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-2">{questions.map((question) => <li key={question}><button onClick={() => askQuestion(question)} className="min-h-11 w-full rounded-md border border-border p-3 text-left text-sm leading-relaxed hover:bg-muted">{question}</button></li>)}</ul> : <p className="mt-2 text-sm text-muted-foreground">No questions were suggested. Start a chat about a file or architecture decision.</p>}
+              <h2 id="questions-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground"><MessageSquare className="h-4 w-4 shrink-0 text-secondary-foreground" aria-hidden="true" />Questions to explore</h2>
+              {questions.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-2">{questions.map((question) => <li key={question}><button onClick={() => askQuestion(question)} className="min-h-11 w-full break-words rounded-md border border-border p-3 text-left text-sm leading-relaxed text-secondary-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{question}</button></li>)}</ul> : <p className="mt-2 text-sm text-secondary-foreground">No questions were suggested. Start a chat about a file or architecture decision.</p>}
               <Button onClick={() => navigate(chatRoute)} className="mt-3 min-h-10 gap-2">Open chat & files<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Button>
             </section>
 
             <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-5" aria-labelledby="review-heading">
-              <div className="min-w-0"><h2 id="review-heading" className="flex items-center gap-2 text-base font-semibold"><GitBranch className="h-4 w-4 text-primary" aria-hidden="true" />VexReview pull-request reviews</h2><p className="mt-1 text-sm text-muted-foreground">Review controls require GitHub sign-in and repository write access. Reviews may post comments to GitHub.</p></div>
+              <div className="min-w-0"><h2 id="review-heading" className="flex items-center gap-2 text-lg font-semibold text-foreground"><GitBranch className="h-4 w-4 shrink-0 text-secondary-foreground" aria-hidden="true" />VexReview pull-request reviews</h2><p className="mt-1 text-sm text-secondary-foreground">Review controls require GitHub sign-in and repository write access. Reviews may post comments to GitHub.</p></div>
               <Button variant="outline" onClick={() => navigate(`/repo/${repoId}/prs${workspaceSearch}`)} className="min-h-10 gap-2">Open pull requests<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Button>
             </section>
-            <p role="status" className={`break-words text-sm ${searchIndex.status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+            <p role="status" className={`break-words text-sm ${searchIndex.status === "error" ? "text-destructive" : "text-secondary-foreground"}`}>
               {searchIndex.status === "pending" ? "Search ingestion is still running. File browsing is available." : searchIndex.status === "ready" ? `Search ingestion returned ${searchIndex.count ?? 0} chunks; vector availability may take time.` : searchIndex.status === "empty" ? "Search ingestion returned no chunks. File browsing is available." : searchIndex.status === "error" ? `Search indexing failed: ${searchIndex.message || "Try indexing again from the homepage."}` : "Repository data is loaded. Search-index readiness has not been checked."}
             </p>
           </motion.div>

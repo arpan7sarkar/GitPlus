@@ -100,16 +100,16 @@ Based on the message and your repo context, what is likely happening here? What 
         name={repo.name}
         active="commits"
         actions={
-          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-7 px-3 text-xs rounded-full">
+          <Button onClick={() => navigate(`/repo/${repoId}/chat`)} size="sm" className="h-11 px-3 text-sm sm:h-9">
             <MessageSquare className="h-3 w-3 mr-1" aria-hidden="true" /> Chat
           </Button>
         }
       />
 
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
         <div className="flex items-center gap-2 mb-4 px-2">
           <GitCommit className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">Recent Commits</h2>
+          <h1 className="text-2xl font-semibold text-foreground">Recent commits</h1>
         </div>
 
         {/* Loading */}
@@ -131,7 +131,7 @@ Based on the message and your repo context, what is likely happening here? What 
                 <h3 className="text-sm font-semibold text-foreground mb-1">Unable to Load Commits</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed mb-3">{error}</p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => loadCommits()} className="h-7 px-3 text-[11px]">
+                  <Button variant="outline" size="sm" onClick={() => loadCommits()} className="h-11 px-3 text-sm sm:h-9">
                     <Loader2 className={`h-3 w-3 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Retry
                   </Button>
                 </div>
@@ -158,19 +158,19 @@ Based on the message and your repo context, what is likely happening here? What 
                   <div className="flex items-start gap-3">
                     <GitCommit className={`h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground`} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="text-sm font-medium text-foreground">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-foreground [overflow-wrap:anywhere]">
                             {c.commit.message.split('\n')[0]}
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <span className="text-[10px] text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded">
+                            <span className="text-xs text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded">
                               {c.sha.slice(0, 7)}
                             </span>
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                               by {c.author?.login || c.commit.author.name}
                             </span>
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
                               <Clock className="h-2.5 w-2.5" /> {timeAgo(c.commit.author.date)}
                             </span>
                           </div>
@@ -179,7 +179,7 @@ Based on the message and your repo context, what is likely happening here? What 
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 px-2 text-[10px]"
+                            className="h-11 px-3 text-sm sm:h-9"
                             onClick={() => explainCommit(c)}
                           >
                             <Sparkles className="h-3 w-3 mr-1 text-primary" /> Explain
@@ -188,7 +188,8 @@ Based on the message and your repo context, what is likely happening here? What 
                             href={c.html_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label={`Open commit ${c.sha.slice(0, 7)} on GitHub`}
+                            className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:h-9 sm:w-9"
                           >
                             <ExternalLink className="h-3 w-3" />
                           </a>
@@ -201,7 +202,7 @@ Based on the message and your repo context, what is likely happening here? What 
             )}
           </div>
         )}
-      </div>
+      </main>
 
       {/* AI Review Panel */}
       <AnimatePresence>
@@ -227,7 +228,7 @@ Based on the message and your repo context, what is likely happening here? What 
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-[10px]"
+                    className="h-11 px-3 text-sm sm:h-9"
                     onClick={() =>
                       navigate(`/repo/${repoId}/chat`, {
                         state: { initialQuestion: `Help me understand this commit ${selectedCommit.sha.slice(0, 7)}: ${selectedCommit.commit.message}` },
@@ -238,7 +239,8 @@ Based on the message and your repo context, what is likely happening here? What 
                   </Button>
                   <button
                     onClick={() => { setAiResponse(""); setSelectedCommit(null); }}
-                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    aria-label="Close commit explanation"
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:h-9 sm:w-9"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

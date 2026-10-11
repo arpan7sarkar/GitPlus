@@ -122,26 +122,26 @@ const MyRepos = () => {
               </div>
 
               {filteredRepos.length ? (
-                <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-4">
                   {filteredRepos.map((repo) => (
-                    <li key={repo.id} className={cn("flex flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between", compact ? "py-3" : "py-4")}>
-                      <div className="min-w-0 flex-1">
-                        <h2 className="break-words font-mono text-sm font-medium">{repo.owner}/{repo.name}</h2>
-                        {repo.description && <p className="mt-1.5 break-words text-sm leading-relaxed text-muted-foreground">{repo.description}</p>}
-                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <li key={repo.id} className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/40 sm:p-5">
+                      <div className="min-w-0">
+                        <h2 className="text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{repo.owner}/{repo.name}</h2>
+                        {repo.description && <p className="mt-2 break-words text-sm leading-relaxed text-secondary-foreground">{repo.description}</p>}
+                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                           {repo.language && <span>{repo.language}</span>}
                           {repo.stars !== null && <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5" aria-hidden="true" /> {repo.stars.toLocaleString()} stars</span>}
                           {repo.forks !== null && <span className="inline-flex items-center gap-1"><GitFork className="h-3.5 w-3.5" aria-hidden="true" /> {repo.forks.toLocaleString()} forks</span>}
                           <span>Indexed <time dateTime={repo.lastIndexedAt}>{new Date(repo.lastIndexedAt).toLocaleDateString()}</time></span>
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button variant="outline" asChild className="min-h-11 gap-2 sm:min-h-9">
+                      <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                        <Button variant="outline" asChild className="h-11 gap-2 px-3 sm:h-10">
                           <a href={`https://github.com/${repo.owner}/${repo.name}`} target="_blank" rel="noopener noreferrer" aria-label={`View ${repo.owner}/${repo.name} on GitHub`}>
                             <ExternalLink className="h-4 w-4" aria-hidden="true" /> GitHub
                           </a>
                         </Button>
-                        <Button onClick={() => navigate(`/repo/${repo.repoId}${workspaceSearch}`)} className="min-h-11 sm:min-h-9" aria-label={`Open ${repo.owner}/${repo.name}`}>
+                        <Button variant="secondary" onClick={() => navigate(`/repo/${repo.repoId}${workspaceSearch}`)} className="h-11 flex-1 px-3 sm:h-10" aria-label={`Open ${repo.owner}/${repo.name}`}>
                           Open overview
                         </Button>
                       </div>

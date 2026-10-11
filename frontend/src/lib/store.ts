@@ -1,5 +1,8 @@
 import { create } from "zustand";
-import type { RepoMeta, OverviewData, FileTreeNode } from "@/lib/mock-data";
+import type { RepoMeta, FileTreeNode } from "@/lib/mock-data";
+import type { OverviewData } from "@/types/backend";
+
+export type SearchIndexStatus = "unknown" | "pending" | "ready" | "empty" | "error";
 
 interface RepoFile {
   path: string;
@@ -18,6 +21,8 @@ interface RepoStore {
   isIndexing: boolean;
   indexingStage: number;
   indexingMessage: string;
+  searchIndex: { status: SearchIndexStatus; message?: string; count?: number };
+  setSearchIndex: (repoId: string, status: SearchIndexStatus, message?: string, count?: number) => void;
   // On-demand mode state
   indexMode: "full" | "on-demand";
   totalSourceFiles: number;
@@ -66,6 +71,10 @@ export const useRepoStore = create<RepoStore>((set) => ({
   isIndexing: false,
   indexingStage: 0,
   indexingMessage: "",
+  searchIndex: { status: "unknown" },
+  setSearchIndex: (repoId, status, message, count) => set((state) =>
+    state.repoId === repoId ? { searchIndex: { status, message, count } } : {}
+  ),
   indexMode: "full",
   totalSourceFiles: 0,
   unfetchedFiles: [],
@@ -79,7 +88,7 @@ export const useRepoStore = create<RepoStore>((set) => ({
   ],
 
   setRepoData: (data) =>
-    set({
+    set((state) => ({
       repoId: data.repoId,
       meta: data.meta,
       fileTree: data.fileTree,
@@ -89,7 +98,15 @@ export const useRepoStore = create<RepoStore>((set) => ({
       indexMode: data.indexMode || "full",
       totalSourceFiles: data.totalSourceFiles || 0,
       unfetchedFiles: data.unfetchedFiles || [],
-    }),
+      ...(state.repoId !== data.repoId ? {
+        overview: null,
+        searchIndex: { status: "unknown" },
+        openedFiles: [],
+        activeFilePath: null,
+        dirtyFiles: new Set<string>(),
+        terminalLogs: [],
+      } : {}),
+    })),
 
   setOverview: (overview) => set({ overview }),
 
@@ -159,6 +176,7 @@ export const useRepoStore = create<RepoStore>((set) => ({
       isIndexing: false,
       indexingStage: 0,
       indexingMessage: "",
+      searchIndex: { status: "unknown" },
       indexMode: "full",
       totalSourceFiles: 0,
       unfetchedFiles: [],

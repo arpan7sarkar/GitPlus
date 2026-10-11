@@ -21,8 +21,8 @@ export default function PageLayout({ title, subtitle, children, category }: Page
       <main id="main-content" tabIndex={-1} className={cn("mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6", compact ? "py-5" : "py-8 sm:py-10")}>
         <header className="mb-6 max-w-3xl">
           {category && <p className="mb-2 text-sm font-medium text-muted-foreground">{category}</p>}
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-          {subtitle && <p className="mt-2 text-base leading-relaxed text-muted-foreground">{subtitle}</p>}
+          <h1 className="text-[clamp(1.5rem,2vw,1.75rem)] font-semibold leading-tight tracking-tight">{title}</h1>
+          {subtitle && <p className="mt-2 text-[15px] leading-relaxed text-secondary-foreground">{subtitle}</p>}
         </header>
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
           {children}

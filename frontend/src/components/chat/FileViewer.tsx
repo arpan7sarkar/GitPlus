@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { X, FileCode, Loader2 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { a11yDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useTheme } from "@/hooks/use-theme";
 import type { Citation } from "@/lib/mock-data";
 import { useRepoStore } from "@/lib/store";
 import { fetchFileContent } from "@/lib/api";
@@ -41,6 +42,7 @@ const detectLanguage = (filePath: string): string => {
 };
 
 const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: FileViewerProps) => {
+  const { theme } = useTheme();
   const { fileContents, meta, githubToken: storeToken, upsertFileContent } = useRepoStore();
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -137,14 +139,14 @@ const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: Fil
             </span>
           )}
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-accent/30 rounded transition-colors">
+        <button onClick={onClose} aria-label="Close file viewer" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-accent sm:h-9 sm:w-9">
           <X className="h-3 w-3 text-muted-foreground" />
         </button>
       </div>
       <div className="flex-1 overflow-auto">
         <SyntaxHighlighter
           language={language}
-          style={vscDarkPlus}
+          style={theme === "dark" ? a11yDark : oneLight}
           showLineNumbers
           startingLineNumber={1}
           wrapLines
@@ -154,13 +156,13 @@ const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: Fil
                 shouldHighlight &&
                 lineNumber >= citation.startLine &&
                 lineNumber <= citation.endLine
-                  ? "rgba(210, 160, 60, 0.06)"
+                  ? "hsl(var(--warning) / 0.1)"
                   : undefined,
               borderLeft:
                 shouldHighlight &&
                 lineNumber >= citation.startLine &&
                 lineNumber <= citation.endLine
-                  ? "2px solid hsl(210, 60%, 55%)"
+                  ? "2px solid hsl(var(--warning))"
                   : "2px solid transparent",
               display: "block",
               paddingLeft: "8px",
@@ -169,8 +171,10 @@ const FileViewer = ({ citation, onClose, repoOwner, repoName, githubToken }: Fil
           customStyle={{
             margin: 0,
             padding: "6px 0",
-            background: "hsl(220, 14%, 9%)",
-            fontSize: "11px",
+            background: "hsl(var(--code-bg))",
+            color: "hsl(var(--foreground))",
+            fontFamily: '"Geist Mono", monospace',
+            fontSize: "13px",
             lineHeight: "1.6",
           }}
         >

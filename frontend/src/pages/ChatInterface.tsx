@@ -17,11 +17,13 @@ import { getChatHistory, saveChatHistoryEntry, removeChatHistoryEntry, type Chat
 import { toast } from "@/hooks/use-toast";
 import { useCompactMode } from "@/hooks/use-compact-mode";
 import { useSettingsStore } from "@/lib/settings-store";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 const ChatInterface = () => {
   const { repoId } = useParams();
   const location = useLocation();
   const compact = useCompactMode();
+  const reducedMotion = useReducedMotion();
   const { settings } = useSettingsStore();
   const { meta: storeMeta, fileTree: storeFileTree, repoContext, githubToken, indexMode: storeIndexMode, unfetchedFiles: storeUnfetchedFiles } = useRepoStore();
 
@@ -31,7 +33,7 @@ const ChatInterface = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [showFileTree, setShowFileTree] = useState(!compact);
+  const [showFileTree, setShowFileTree] = useState(() => !compact && window.matchMedia("(min-width: 1024px)").matches);
   const [selectedFile, setSelectedFile] = useState<string | undefined>();
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -54,8 +56,8 @@ const ChatInterface = () => {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth" });
+  }, [messages, reducedMotion]);
 
   const persistToHistory = useCallback(async (msgs: ChatMessage[], sid: string) => {
     if (!settings.autoSaveChatHistory || !repo) return;
@@ -226,25 +228,25 @@ const ChatInterface = () => {
         active="chat"
         sticky={false}
         badge={storeIndexMode === "on-demand" && (
-          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[8px] text-amber-500 font-bold uppercase tracking-wider">ON-DEMAND</span>
+          <span className="ml-1.5 rounded border border-border bg-muted px-2 py-1 text-xs font-medium text-warning">On-demand</span>
         )}
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={startNewChat} className="h-6 px-2 text-[11px] text-muted-foreground gap-1" aria-label="Start new chat">
+            <Button variant="ghost" size="sm" onClick={startNewChat} className="h-11 px-3 text-sm sm:h-9 text-muted-foreground gap-1" aria-label="Start new chat">
               <Plus className="h-3 w-3" aria-hidden="true" /> New
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)}
-              className={`h-6 px-2 text-[11px] gap-1 ${showHistory ? "text-primary" : "text-muted-foreground"}`} aria-label="Toggle chat history">
+              className={`h-11 px-3 text-sm sm:h-9 gap-1 ${showHistory ? "text-primary" : "text-muted-foreground"}`} aria-label="Toggle chat history">
               <History className="h-3 w-3" aria-hidden="true" /> History
             </Button>
             {messages.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={handleShare} className="h-6 px-2 text-[11px] text-muted-foreground gap-1" aria-label="Copy share link">
+              <Button variant="ghost" size="sm" onClick={handleShare} className="h-11 px-3 text-sm sm:h-9 text-muted-foreground gap-1" aria-label="Copy share link">
                 {copied ? <Check className="h-3 w-3 text-success" /> : <Share2 className="h-3 w-3" />}
                 {copied ? "Copied" : "Share"}
               </Button>
             )}
             {!compact && (
-              <Button variant="ghost" size="sm" onClick={() => setShowFileTree(!showFileTree)} className="h-6 w-6 p-0 text-muted-foreground" aria-label="Toggle file tree">
+              <Button variant="ghost" size="sm" onClick={() => setShowFileTree(!showFileTree)} className="h-11 w-11 p-0 text-muted-foreground sm:h-9 sm:w-9" aria-label="Toggle file tree">
                 {showFileTree ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
               </Button>
             )}
@@ -252,11 +254,11 @@ const ChatInterface = () => {
         }
       />
 
-      <div className="flex-1 flex min-h-0">
+      <div id="main-content" tabIndex={-1} role="main" className="relative flex min-h-0 flex-1">
         <AnimatePresence>
           {showFileTree && !compact && (
-            <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 240, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }} transition={{ duration: 0.15 }} className="shrink-0 overflow-hidden">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="absolute inset-y-0 left-0 z-20 w-[min(280px,100%)] shrink-0 overflow-auto border-r border-border bg-background lg:static lg:w-[260px]">
               <FileTree tree={fileTree} onFileSelect={handleFileSelect} selectedFile={selectedFile} />
             </motion.div>
           )}
@@ -270,22 +272,20 @@ const ChatInterface = () => {
                 exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.15 }}
                 className="overflow-hidden border-b border-border">
                 <div className="p-2.5 max-h-40 overflow-y-auto space-y-0.5">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Previous Sessions</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Previous Sessions</p>
                   {chatHistory.map((entry) => (
-                    <button key={entry.sessionId} onClick={() => loadSession(entry)}
-                      className={`w-full text-left flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-accent/30 transition-colors group ${entry.sessionId === sessionId ? "bg-accent/20" : ""
-                        }`}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] text-foreground truncate">{entry.lastMessage || "Empty chat"}</p>
-                        <p className="text-[10px] text-muted-foreground">
+                    <div key={entry.sessionId} className={`flex items-center gap-2 rounded-md ${entry.sessionId === sessionId ? "bg-accent" : ""}`}>
+                      <button onClick={() => loadSession(entry)} className="min-h-11 min-w-0 flex-1 rounded-md px-3 py-2 text-left hover:bg-accent">
+                        <p className="break-words text-sm text-foreground">{entry.lastMessage || "Empty chat"}</p>
+                        <p className="text-xs text-muted-foreground">
                           {entry.messageCount} messages · {new Date(entry.updatedAt).toLocaleDateString()}
                         </p>
-                      </div>
-                      <button onClick={(e) => deleteHistoryEntry(e, entry.sessionId)}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all">
-                        <Trash2 className="h-3 w-3" />
                       </button>
-                    </button>
+                      <button onClick={(e) => deleteHistoryEntry(e, entry.sessionId)} aria-label="Delete saved conversation"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-destructive">
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </motion.div>
@@ -307,7 +307,7 @@ const ChatInterface = () => {
               <ChatMessageComponent key={msg.id} message={msg} onCitationClick={handleCitationClick} />
             ))}
             {isStreaming && messages[messages.length - 1]?.content === "" && (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground pl-9">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground pl-9">
                 <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />
                 Thinking...
               </div>
@@ -321,9 +321,9 @@ const ChatInterface = () => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                 disabled={isStreaming}
-                className="text-sm bg-card border-border h-9" />
+                className="h-11 bg-card text-base sm:h-10 sm:text-sm" aria-label="Message about this codebase" />
               <Button onClick={() => handleSend()} disabled={!inputValue.trim() || isStreaming}
-                size="icon" className="h-9 w-9 shrink-0">
+                size="icon" className="h-11 w-11 shrink-0 sm:h-10 sm:w-10" aria-label="Send message">
                 <Send className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -332,8 +332,8 @@ const ChatInterface = () => {
 
         <AnimatePresence>
           {activeCitation && !compact && (
-            <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: "40%", opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }} transition={{ duration: 0.15 }} className="shrink-0 overflow-hidden">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="absolute inset-0 z-30 w-full shrink-0 overflow-hidden bg-background lg:static lg:w-[40%]">
               <FileViewer
                 citation={activeCitation}
                 repoOwner={repo.owner}

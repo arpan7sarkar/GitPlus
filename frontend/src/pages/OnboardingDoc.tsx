@@ -3,9 +3,7 @@ import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Download, Copy, Check, Loader2, FileText, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import Markdown from "@/components/ui/markdown";
 import { useRepoStore } from "@/lib/store";
 import { generateOnboardingDoc } from "@/lib/api";
 import WorkspaceNav from "@/components/layout/WorkspaceNav";
@@ -73,11 +71,11 @@ const OnboardingDoc = () => {
         actions={
           markdown ? (
             <>
-              <Button variant="ghost" size="sm" onClick={handleCopy} className="h-7 text-xs" aria-label="Copy guide to clipboard">
+              <Button variant="ghost" size="sm" onClick={handleCopy} className="h-11 text-sm sm:h-9" aria-label="Copy guide to clipboard">
                 {copied ? <Check className="h-3.5 w-3.5 mr-1" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5 mr-1" aria-hidden="true" />}
                 {copied ? "Copied" : "Copy"}
               </Button>
-              <Button size="sm" onClick={handleDownload} className="h-7 text-xs rounded-full" aria-label="Download guide as markdown">
+              <Button size="sm" onClick={handleDownload} className="h-11 text-sm sm:h-9" aria-label="Download guide as markdown">
                 <Download className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
                 .md
               </Button>
@@ -86,18 +84,18 @@ const OnboardingDoc = () => {
         }
       />
 
-      <div className="container mx-auto px-6 py-8 max-w-3xl">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           {!markdown && !loading && (
             <div className="text-center py-20">
               <div className="w-16 h-16 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6">
                 <FileText className="h-7 w-7 text-primary" />
               </div>
-              <h1 className="text-2xl font-bold mb-2">Generate Onboarding Guide</h1>
-              <p className="text-muted-foreground text-sm mb-8 max-w-md mx-auto">
+              <h1 className="text-2xl font-semibold mb-2">Generate Onboarding Guide</h1>
+              <p className="text-secondary-foreground text-sm leading-relaxed mb-8 max-w-md mx-auto">
                 AI will analyze the codebase and generate a comprehensive onboarding document with setup instructions, key files, patterns, and gotchas.
               </p>
-              <Button onClick={handleGenerate} className="bg-primary text-primary-foreground hover:bg-primary/90 font-mono">
+              <Button onClick={handleGenerate} className="h-11 text-sm font-medium sm:h-10">
                 <Zap className="h-4 w-4 mr-2" />
                 Generate Onboarding Guide
               </Button>
@@ -112,32 +110,12 @@ const OnboardingDoc = () => {
           )}
 
           {markdown && !loading && (
-            <div className="prose prose-invert prose-sm max-w-none prose-headings:font-bold prose-headings:text-foreground prose-p:text-secondary-foreground prose-a:text-primary prose-code:text-primary prose-code:bg-secondary prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-code-bg prose-pre:border prose-pre:border-border prose-strong:text-foreground prose-li:text-secondary-foreground">
-              <ReactMarkdown
-                components={{
-                  code({ className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || "");
-                    const inline = !match;
-                    return inline ? (
-                      <code className={className} {...props}>{children}</code>
-                    ) : (
-                      <SyntaxHighlighter
-                        style={vscDarkPlus}
-                        language={match[1]}
-                        customStyle={{ margin: 0, background: "hsl(220, 20%, 8%)", fontSize: "12px" }}
-                      >
-                        {String(children).replace(/\n$/, "")}
-                      </SyntaxHighlighter>
-                    );
-                  },
-                }}
-              >
-                {markdown}
-              </ReactMarkdown>
-            </div>
+            <Markdown className="text-[15px] leading-relaxed text-secondary-foreground [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg">
+              {markdown}
+            </Markdown>
           )}
         </motion.div>
-      </div>
+      </main>
     </div>
   );
 };

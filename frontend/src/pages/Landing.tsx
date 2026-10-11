@@ -169,11 +169,11 @@ const Landing = () => {
         >
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
-              <p className="mb-2 text-sm font-medium text-primary">Codebase workspace</p>
-              <h1 id="connect-heading" className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              <p className="mb-2 text-sm font-medium text-muted-foreground">Codebase workspace</p>
+              <h1 id="connect-heading" className="text-[clamp(2.5rem,3.2vw,2.75rem)] font-semibold leading-[1.15] tracking-tight">
                 Understand a repository.
               </h1>
-              <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+              <p className="mt-3 text-[15px] leading-relaxed text-secondary-foreground">
                 Connect a GitHub repository to explore its files, inspect architecture,
                 follow activity, and ask questions with source references you can verify.
               </p>
@@ -207,7 +207,7 @@ const Landing = () => {
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                className="h-11 min-w-0 flex-1 bg-background font-mono text-sm"
+                className="h-11 min-w-0 flex-1 bg-background font-mono text-base sm:text-sm"
               />
               <Button type="submit" className="h-11 shrink-0 gap-2 px-5 text-sm">
                 Analyze repository <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -216,7 +216,7 @@ const Landing = () => {
             {urlError ? (
               <p id="repo-url-error" role="alert" className="mt-2 text-sm text-destructive">{urlError}</p>
             ) : (
-              <p id="repo-url-help" className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <p id="repo-url-help" className="mt-2 text-sm leading-relaxed text-secondary-foreground">
                 Public repositories work without signing in. Use GitHub sign-in or a token for private access.
               </p>
             )}
@@ -239,9 +239,9 @@ const Landing = () => {
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck={false}
-                  className="h-11 max-w-lg bg-background font-mono text-sm"
+                  className="h-11 max-w-lg bg-background font-mono text-base sm:text-sm"
                 />
-                <p id="github-pat-help" className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                <p id="github-pat-help" className="mt-2 max-w-3xl text-sm leading-relaxed text-secondary-foreground">
                   Use a token with access to the repository. It is saved in this browser and sent
                   to the backend for GitHub requests. Signed-in GitHub access is used when no token is provided.
                 </p>
@@ -249,7 +249,7 @@ const Landing = () => {
             </Collapsible>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-              <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+              <p className="max-w-3xl text-sm leading-relaxed text-secondary-foreground">
                 Repository text may be stored for search and sent to external AI providers.
                 Only connect code you are allowed to share.
               </p>
@@ -281,15 +281,15 @@ const Landing = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             {CAPABILITIES.map(({ icon: Icon, title, description }) => (
               <div key={title} className="flex items-start gap-3 rounded-lg border border-border bg-card p-4">
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0">
                   <h3 className="text-sm font-semibold">{title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-secondary-foreground">{description}</p>
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-4 text-sm leading-relaxed text-secondary-foreground">
             AI output is a starting point, not a guarantee. Verify findings, suggested changes, and citations against the source.
           </p>
         </section>

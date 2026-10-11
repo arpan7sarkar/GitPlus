@@ -142,32 +142,32 @@ export function UserRepos({ onIndex }: UserReposProps) {
               </div>
 
               {filteredRepos.length ? (
-                <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-4">
                   {filteredRepos.map((repo) => (
-                    <li key={repo.id} className={cn("flex flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between", compact ? "py-3" : "py-4")}>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <li key={repo.id} className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent/40 sm:p-5">
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                          <h3 className="min-w-0 break-words font-mono text-sm font-medium">{repo.full_name}</h3>
                           <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
                             {repo.private ? <Lock className="h-3 w-3" aria-hidden="true" /> : <Globe className="h-3 w-3" aria-hidden="true" />}
                             {repo.private ? "Private" : "Public"}
                           </span>
                         </div>
-                        {repo.description && <p className="mt-1.5 break-words text-sm leading-relaxed text-muted-foreground">{repo.description}</p>}
-                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <h3 className="text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">{repo.full_name}</h3>
+                        {repo.description && <p className="mt-2 break-words text-sm leading-relaxed text-secondary-foreground">{repo.description}</p>}
+                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
                           {repo.language && <span>{repo.language}</span>}
                           <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5" aria-hidden="true" /> {repo.stargazers_count.toLocaleString()} stars</span>
                           <span>Updated <time dateTime={repo.updated_at}>{new Date(repo.updated_at).toLocaleDateString()}</time></span>
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button variant="outline" asChild className="min-h-11 gap-2 sm:min-h-9">
+                      <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
+                        <Button variant="outline" asChild className="h-11 flex-1 gap-2 px-3 sm:h-10">
                           <a href={repo.html_url} target="_blank" rel="noopener noreferrer" aria-label={`View ${repo.full_name} on GitHub`}>
                             <ExternalLink className="h-4 w-4" aria-hidden="true" /> GitHub
                           </a>
                         </Button>
-                        <Button onClick={() => onIndex(repo.html_url)} className="min-h-11 sm:min-h-9" aria-label={`Analyze ${repo.full_name}`}>
+                        <Button variant="secondary" onClick={() => onIndex(repo.html_url)} className="h-11 flex-1 px-3 sm:h-10" aria-label={`Analyze ${repo.full_name}`}>
                           Analyze
                         </Button>
                       </div>
