@@ -3,7 +3,7 @@
  * Replaces: supabase/functions/chat/index.ts
  *
  * Provider failover chain:
- *   1. Google Gemini (primary, configurable)
+ *   1. Google Gemini 2.0 Flash (primary)
  *   2. OpenAI GPT-4o-mini (fallback)
  *
  * Supported action modes on POST /api/chat:
@@ -31,7 +31,7 @@ const PROVIDERS: ProviderConfig[] = [
   {
     name: "gemini",
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    model: process.env.GOOGLE_GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     getKey: () => process.env.GOOGLE_GEMINI_API_KEY,
   },
   {
@@ -236,7 +236,8 @@ router.post("/", async (req: Request, res: Response) => {
           }
         } catch (retrievalErr) {
           if (isReingestRequiredError(retrievalErr)) {
-            return res.status(500).json({ error: (retrievalErr as Error).message });
+            console.warn("[chat] Re-indexing required:", retrievalErr.message);
+            return res.status(409).json({ error: retrievalErr.userMessage });
           }
           console.warn("[chat] Retrieval failed, falling back to repoContext:", retrievalErr);
         }

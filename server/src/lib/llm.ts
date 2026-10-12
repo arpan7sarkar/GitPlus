@@ -1,7 +1,7 @@
 /**
  * Shared LLM Completion Helper
  * Single provider-failover primitive used by every non-streaming LLM caller on
- * the server (ingest summarization, VexReview PR review). Tries the configured Gemini model
+ * the server (ingest summarization, VexReview PR review). Tries Gemini 2.0 Flash
  * first, falls back to OpenAI GPT-4o-mini, and puts a provider in a 60s cooldown
  * after a 429 so a rate-limited provider isn't hammered by every subsequent call.
  *
@@ -20,7 +20,7 @@ const PROVIDERS: ProviderConfig[] = [
   {
     name: "gemini",
     url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    model: process.env.GOOGLE_GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     getKey: () => process.env.GOOGLE_GEMINI_API_KEY,
   },
   {

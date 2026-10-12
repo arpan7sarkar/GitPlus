@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const modelCases = [
-  { name: "unset", value: undefined, expected: "gemini-2.5-flash" },
-  { name: "whitespace", value: " \t ", expected: "gemini-2.5-flash" },
-  { name: "override", value: " offline-gemini-model ", expected: "offline-gemini-model" },
+  { name: "unset", value: undefined },
+  { name: "whitespace", value: " \t " },
+  { name: "override", value: " offline-gemini-model " },
 ];
 
 for (const [index, modelCase] of modelCases.entries()) {
-  test(`completeText uses the ${modelCase.name} Gemini model setting`, async (t) => {
+  test(`completeText retains Gemini 2.0 Flash with ${modelCase.name} override`, async (t) => {
     const values = {
       GOOGLE_GEMINI_MODEL: modelCase.value,
       GOOGLE_GEMINI_API_KEY: "offline-gemini-key",
@@ -26,12 +26,12 @@ for (const [index, modelCase] of modelCases.entries()) {
       else process.env[name] = value;
     }
 
-    const upstreamFetch = t.mock.method(globalThis, "fetch", async (input, init) => {
+    const upstreamFetch = t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       assert.equal(String(input), "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
       assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer offline-gemini-key");
       assert.equal(typeof init?.body, "string");
       const body = JSON.parse(init!.body as string);
-      assert.equal(body.model, modelCase.expected);
+      assert.equal(body.model, "gemini-2.0-flash");
       assert.equal(body.max_tokens, 32);
       assert.equal(body.temperature, 0.1);
       assert.deepEqual(body.messages, [

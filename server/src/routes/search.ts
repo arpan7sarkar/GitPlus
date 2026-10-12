@@ -20,7 +20,7 @@ import path from "path";
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
 import { ensureIndex, upsertChunks, deleteByRepo, PINECONE_DIMENSION, type NodeLevel, type NodePayload } from "../lib/pinecone.js";
-import { describeEmbedding, generateEmbeddingsBatch, getEmbeddingConfig } from "../lib/embeddings.js";
+import { describeEmbedding, generateEmbeddingsBatch, getEmbeddingConfig, isReingestRequiredError } from "../lib/embeddings.js";
 import { chunkCodeFiles, detectCategory, hash, type FileNode, type SymbolChunk } from "../lib/chunker.js";
 import { summarizeFile, summarizeModule, summarizeRepo, mapWithConcurrency } from "../lib/summarize.js";
 import { retrieveForQuery } from "../lib/retrieval.js";
@@ -372,6 +372,10 @@ router.post("/hybrid", async (req: Request, res: Response) => {
       })),
     });
   } catch (err: any) {
+    if (isReingestRequiredError(err)) {
+      console.warn("[search-hybrid] Re-indexing required:", err.message);
+      return res.status(409).json({ error: err.userMessage });
+    }
     console.error("[search-hybrid error]:", err);
     return res.status(500).json({ error: err.message || "Hybrid search failed" });
   }

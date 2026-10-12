@@ -230,6 +230,11 @@ function sameConfig(a: EmbeddingConfig, b: EmbeddingConfig): boolean {
   return a.provider === b.provider && a.model === b.model && a.dimensions === b.dimensions;
 }
 
+export class ReingestRequiredError extends Error {
+  name = "ReingestRequiredError";
+  readonly userMessage = "Please re-index this repository before searching or chatting; its search index is missing or incompatible.";
+}
+
 /**
  * Verify stored vectors were embedded with the currently configured model.
  * Throws a clear, actionable error on any mismatch — including legacy vectors
@@ -269,7 +274,7 @@ export function assertEmbeddingConsistency(
         `than the current query embedding ${JSON.stringify(expected)}`
     );
   }
-  throw new Error(
+  throw new ReingestRequiredError(
     `[embeddings] Embedding model mismatch for repo ${JSON.stringify(repoId)}: ${parts.join("; ")}. ` +
       `Vectors from different models live in incompatible vector spaces, so search results would be meaningless. ` +
       `Re-ingest the repository (POST /api/search/ingest) with the current EMBEDDING_* configuration before searching.`
@@ -282,12 +287,8 @@ export function assertEmbeddingConsistency(
  * Callers (e.g. /api/chat) use this to surface the error instead of silently
  * falling back to keyword-only results or a static context blob.
  */
-export function isReingestRequiredError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    error.message.includes("[embeddings]") &&
-    error.message.includes("Re-ingest the repository")
-  );
+export function isReingestRequiredError(error: unknown): error is ReingestRequiredError {
+  return error instanceof ReingestRequiredError;
 }
 
 /**
@@ -322,7 +323,7 @@ export function assertLegacyPineconeCoverage(
   ).length;
   if (untagged === 0) return;
   const expected = describeEmbedding(current);
-  throw new Error(
+  throw new ReingestRequiredError(
     `[embeddings] Embedding model mismatch for repo ${JSON.stringify(repoId)}: ` +
       `${untagged} stored node(s) predate embedding-model tracking (no provider/model metadata) ` +
       `and no Pinecone vectors were found for the current query embedding ${JSON.stringify(expected)}. ` +

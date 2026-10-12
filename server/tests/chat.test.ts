@@ -6,9 +6,9 @@ import express from "express";
 import pg from "pg";
 
 const modelCases = [
-  { name: "unset", value: undefined, expected: "gemini-2.5-flash" },
-  { name: "whitespace", value: " \t ", expected: "gemini-2.5-flash" },
-  { name: "override", value: " offline-gemini-model ", expected: "offline-gemini-model" },
+  { name: "unset", value: undefined },
+  { name: "whitespace", value: " \t " },
+  { name: "override", value: " offline-gemini-model " },
 ];
 
 function postJson(port: number, body: object): Promise<{ status: number | undefined; headers: IncomingHttpHeaders; body: string }> {
@@ -35,7 +35,7 @@ function postJson(port: number, body: object): Promise<{ status: number | undefi
 
 for (const [index, modelCase] of modelCases.entries()) {
   for (const streaming of [false, true]) {
-    test(`chat ${streaming ? "SSE" : "JSON"} uses the ${modelCase.name} Gemini model setting`, async (t) => {
+    test(`chat ${streaming ? "SSE" : "JSON"} retains Gemini 2.0 Flash with ${modelCase.name} override`, async (t) => {
       const values = {
         GOOGLE_GEMINI_MODEL: modelCase.value,
         GOOGLE_GEMINI_API_KEY: "offline-gemini-key",
@@ -62,12 +62,12 @@ for (const [index, modelCase] of modelCases.entries()) {
       });
       const streamBody = 'data: {"choices":[{"delta":{"content":"Offline reply"}}]}\n\ndata: [DONE]\n\n';
       const completion = '{"narrative":"Offline overview"}';
-      const upstreamFetch = t.mock.method(globalThis, "fetch", async (input, init) => {
+      const upstreamFetch = t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
         assert.equal(String(input), "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
         assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer offline-gemini-key");
         assert.equal(typeof init?.body, "string");
         const body = JSON.parse(init!.body as string);
-        assert.equal(body.model, modelCase.expected);
+        assert.equal(body.model, "gemini-2.0-flash");
         assert.equal(body.stream, streaming);
         assert.equal(body.messages[0].role, "system");
         assert.equal(body.messages[1].role, "user");

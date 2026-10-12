@@ -81,7 +81,6 @@ for (const scenario of [
       OPENAI_EMBEDDING_MODEL: undefined,
       EMBEDDING_DIMENSIONS: String(scenario.configuredDimensions),
       GOOGLE_GEMINI_API_KEY: GEMINI_KEY,
-      GOOGLE_GEMINI_MODEL: "offline-summary-model",
       OPENAI_API_KEY: undefined,
       PINECONE_API_KEY: "offline-pinecone-key",
       PINECONE_INDEX_NAME: INDEX_NAME,
@@ -119,13 +118,13 @@ for (const scenario of [
     assert.equal(prisma, offlinePrisma);
     const oldNodes = [{ id: "existing-node", repoId: REPO_ID }];
     let storedNodes: object[] = [...oldNodes];
-    const deleted = t.mock.method(prisma.node, "deleteMany", async (args) => {
+    const deleted = t.mock.method(prisma.node, "deleteMany", async (args: Parameters<typeof offlinePrisma.node.deleteMany>[0]) => {
       assert.ok(scenario.success, "failed ingestion must not attempt database deletion");
       assert.deepEqual(args, { where: { repoId: REPO_ID } });
       storedNodes = [];
       return { count: oldNodes.length };
     });
-    const created = t.mock.method(prisma.node, "createMany", async (args) => {
+    const created = t.mock.method(prisma.node, "createMany", async (args: Parameters<typeof offlinePrisma.node.createMany>[0]) => {
       assert.ok(scenario.success, "failed ingestion must not attempt database writes");
       assert.equal(args.skipDuplicates, true);
       storedNodes = [...args.data as NodeRecord[]];
@@ -158,6 +157,7 @@ for (const scenario of [
       assert.equal(typeof init?.body, "string");
       const body = JSON.parse(init!.body as string);
       if (url.href === "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions") {
+        assert.equal(body.model, "gemini-2.0-flash");
         summaryCalls++;
         return Response.json({ choices: [{ message: { content: "Offline repository summary." } }] });
       }

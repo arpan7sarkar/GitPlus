@@ -6,6 +6,8 @@ import {
   generateEmbedding,
   generateEmbeddingsBatch,
   getEmbeddingConfig,
+  isReingestRequiredError,
+  ReingestRequiredError,
 } from "../src/lib/embeddings.js";
 import {
   getEmbeddingDimensions,
@@ -168,7 +170,7 @@ for (const provider of ["openai", "gemini"] as const) {
     texts[0] = "x".repeat(9000);
     const received: string[] = [];
     const sizes: number[] = [];
-    const upstream = t.mock.method(globalThis, "fetch", async (_input, init) => {
+    const upstream = t.mock.method(globalThis, "fetch", async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(init?.body as string);
       const batch: string[] = provider === "gemini"
         ? body.requests.map((item: { content: { parts: { text: string }[] }; outputDimensionality: number }) => {
@@ -255,7 +257,7 @@ for (const provider of ["openai", "gemini"] as const) {
       OPENAI_API_KEY: `offline-openai-${t.name}`,
       GOOGLE_GEMINI_API_KEY: "offline-gemini-key",
     });
-    const upstream = t.mock.method(globalThis, "fetch", async (_input, init) => {
+    const upstream = t.mock.method(globalThis, "fetch", async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(init?.body as string);
       const count = provider === "gemini" ? body.requests.length : body.input.length;
       const dimensions = count === 100 ? 1024 : 3072;
@@ -274,7 +276,7 @@ test("Gemini honors an explicit native model and output dimensionality", async (
     GOOGLE_GEMINI_EMBEDDING_MODEL: "models/offline-gemini-model",
     EMBEDDING_DIMENSIONS: "768",
   });
-  t.mock.method(globalThis, "fetch", async (input, init) => {
+  t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     assert.equal(String(input), "https://generativelanguage.googleapis.com/v1beta/models/offline-gemini-model:batchEmbedContents");
     const body = JSON.parse(init?.body as string);
     assert.equal(body.requests[0].model, "models/offline-gemini-model");
@@ -310,7 +312,7 @@ for (const status of [429, 503]) {
     setEnv(t, { EMBEDDING_PROVIDER: "gemini", GOOGLE_GEMINI_API_KEY: "offline-gemini-key" });
     t.mock.method(console, "warn", () => {});
     let attempts = 0;
-    const upstream = t.mock.method(globalThis, "fetch", async (input) => {
+    const upstream = t.mock.method(globalThis, "fetch", async (input: RequestInfo | URL) => {
       assert.match(String(input), /:batchEmbedContents$/);
       attempts++;
       return attempts === 1
@@ -338,6 +340,16 @@ test("Gemini authentication errors are sanitized and not retried", async (t) => 
 });
 
 const CURRENT = { provider: "openai", model: "text-embedding-3-large", dimensions: 1024 } as const;
+
+test("re-indexing error classification uses its type, not diagnostic wording", () => {
+  const error = new ReingestRequiredError("Diagnostic wording may change");
+  assert.equal(error.name, "ReingestRequiredError");
+  assert.ok(isReingestRequiredError(error));
+  assert.match(error.userMessage, /re-index this repository/i);
+  assert.equal(isReingestRequiredError(new Error("[embeddings] Re-ingest the repository")), false);
+  assert.equal(isReingestRequiredError({ message: error.message }), false);
+  assert.equal(isReingestRequiredError(null), false);
+});
 
 function tagged(provider: string, model: string, dimensions: number) {
   return { payload: { embeddingProvider: provider, embeddingModel: model, embeddingDimensions: dimensions } };
@@ -375,7 +387,7 @@ test("assertEmbeddingConsistency throws on dimension mismatch and legacy untagge
     /Embedding model mismatch.*Re-ingest the repository/s
   );
   assert.throws(
-    () => assertEmbeddingConsistency("repo-1", [{ payload: { repoId: "repo-1" } }], CURRENT),
+    () => assertEmbeddingConsistency("repo-1", [{ payload: {} }], CURRENT),
     (error: unknown) => {
       assert.ok(error instanceof Error);
       assert.match(error.message, /predate embedding-model tracking/);
