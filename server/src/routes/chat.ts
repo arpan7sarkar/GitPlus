@@ -15,6 +15,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import { isReingestRequiredError } from "../lib/embeddings.js";
 import { retrieveForQuery } from "../lib/retrieval.js";
 
 const router = Router();
@@ -219,7 +220,11 @@ router.post("/", async (req: Request, res: Response) => {
     // relevant to THIS question fresh every turn instead of reusing one static
     // repoContext blob for the whole conversation. Falls back to the frontend-
     // supplied repoContext if there's no repoId or retrieval comes back empty
-    // (e.g. repo hasn't been ingested into the search index yet).
+    // (e.g. repo hasn't been ingested into the search index yet). Unrelated
+    // retrieval failures also fall back, but actionable embedding-mismatch /
+    // re-ingest errors are returned immediately (before any SSE headers) so a
+    // stale or pre-migration index never silently generates an answer from
+    // static repoContext.
     let effectiveContext = repoContext;
     if (action === "chat" && repoId) {
       const lastUserMessage = [...messages].reverse().find((m: any) => m.role === "user");
@@ -230,6 +235,9 @@ router.post("/", async (req: Request, res: Response) => {
             effectiveContext = contextText;
           }
         } catch (retrievalErr) {
+          if (isReingestRequiredError(retrievalErr)) {
+            return res.status(500).json({ error: (retrievalErr as Error).message });
+          }
           console.warn("[chat] Retrieval failed, falling back to repoContext:", retrievalErr);
         }
       }

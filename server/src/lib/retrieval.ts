@@ -16,11 +16,15 @@
  * verified against the currently configured embedding model before fusion. A
  * mismatch — e.g. a repo ingested with Gemini embeddings queried with OpenAI —
  * throws a clear re-ingest error instead of returning meaningless neighbours.
+ * Pre-migration repos with untagged Postgres nodes and no Pinecone vectors
+ * (Actian-era vectors never migrated) are likewise rejected with a re-ingest
+ * error rather than silently degrading to keyword-only results; genuinely
+ * unindexed repos with no stored nodes keep their normal empty results.
  */
 
 import { prisma } from "./prisma.js";
 import { vectorSearch, type SearchHit, type NodeLevel } from "./pinecone.js";
-import { assertEmbeddingConsistency, generateEmbedding, getEmbeddingConfig } from "./embeddings.js";
+import { assertEmbeddingConsistency, assertLegacyPineconeCoverage, generateEmbedding, getEmbeddingConfig } from "./embeddings.js";
 import { keywordSearch, reciprocalRankFusion } from "./hybridSearch.js";
 
 export interface RetrievedChunk {
@@ -181,6 +185,15 @@ export async function retrieveForQuery(
       ),
     embeddingConfig
   );
+
+  // Pre-migration repositories hold untagged Postgres nodes while Pinecone
+  // holds no vectors for the repo (Actian-era vectors were never migrated).
+  // Both checks above pass in that state (empty dense input is accepted, and
+  // untagged rows are filtered out of the tagged check), so without this the
+  // request silently degrades to keyword-only results. Throw a re-ingest
+  // error instead — except for genuinely unindexed repos with no stored
+  // nodes, which keep their normal empty results.
+  assertLegacyPineconeCoverage(repoId, denseResults, dbNodes, embeddingConfig);
 
   const dbNodeById = new Map(dbNodes.map((n) => [n.id, n]));
 

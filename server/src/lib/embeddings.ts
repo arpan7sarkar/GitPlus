@@ -275,3 +275,58 @@ export function assertEmbeddingConsistency(
       `Re-ingest the repository (POST /api/search/ingest) with the current EMBEDDING_* configuration before searching.`
   );
 }
+
+/**
+ * Whether an error is an actionable embedding-mismatch / re-ingest error
+ * thrown by assertEmbeddingConsistency() or assertLegacyPineconeCoverage().
+ * Callers (e.g. /api/chat) use this to surface the error instead of silently
+ * falling back to keyword-only results or a static context blob.
+ */
+export function isReingestRequiredError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("[embeddings]") &&
+    error.message.includes("Re-ingest the repository")
+  );
+}
+
+/**
+ * Detect pre-migration repositories: PostgreSQL holds nodes that predate
+ * embedding-model tracking (untagged), while Pinecone holds no vectors for
+ * the repo (e.g. Actian-era vectors were never migrated).
+ *
+ * assertEmbeddingConsistency() intentionally accepts empty dense results (a
+ * genuinely unindexed repo has nothing to compare), and retrieval filters
+ * untagged Postgres rows out of the tagged consistency check (keyword search
+ * needs no vectors). Without this extra check, such a legacy repo silently
+ * degrades to keyword-only HTTP 200 results instead of requesting re-ingest.
+ *
+ * No-op when Pinecone returned hits (normal path) or when Postgres holds no
+ * nodes at all (genuinely unindexed repo — callers preserve their empty
+ * results / static-context fallback). Otherwise throws an actionable
+ * re-ingest error matching isReingestRequiredError().
+ */
+export function assertLegacyPineconeCoverage(
+  repoId: string,
+  denseResults: unknown[],
+  dbNodes: StoredEmbeddingTags[],
+  current: EmbeddingConfig = getEmbeddingConfig()
+): void {
+  if (denseResults.length > 0) return;
+  if (dbNodes.length === 0) return;
+  const untagged = dbNodes.filter(
+    (node) =>
+      node?.embeddingProvider == null ||
+      node?.embeddingModel == null ||
+      node?.embeddingDimensions == null
+  ).length;
+  if (untagged === 0) return;
+  const expected = describeEmbedding(current);
+  throw new Error(
+    `[embeddings] Embedding model mismatch for repo ${JSON.stringify(repoId)}: ` +
+      `${untagged} stored node(s) predate embedding-model tracking (no provider/model metadata) ` +
+      `and no Pinecone vectors were found for the current query embedding ${JSON.stringify(expected)}. ` +
+      `This repository was indexed before the Pinecone migration, so its vectors are absent from Pinecone. ` +
+      `Re-ingest the repository (POST /api/search/ingest) with the current EMBEDDING_* configuration before searching.`
+  );
+}

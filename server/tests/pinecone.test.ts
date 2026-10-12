@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, test } from "node:test";
 import { inspect } from "node:util";
 import { Pinecone } from "@pinecone-database/pinecone";
@@ -264,7 +265,7 @@ test("validation HTTP failures are sanitized, unavailable, and retryable", async
   await pc.ensureIndex();
 });
 
-test("upsert uses the original node IDs and string nodeId roundtrip", async () => {
+test("upsert derives ASCII record IDs and preserves the original nodeId", async () => {
   const pc = await adapter();
   const p = point();
   p.payload.nodeId = "must-be-overwritten";
@@ -274,8 +275,9 @@ test("upsert uses the original node IDs and string nodeId roundtrip", async () =
   await pc.upsertChunks([p]);
   const writes = calls("/vectors/upsert");
   const first = (writes[0].body.vectors as WireRecord[])[0];
-  assert.equal(first.id, p.id);
-  assert.equal((writes[1].body.vectors as WireRecord[])[0].id, p.id);
+  assert.equal(first.id, pc.toRecordId(p.id));
+  assert.match(first.id, /^[0-9a-f]{64}$/);
+  assert.equal((writes[1].body.vectors as WireRecord[])[0].id, first.id);
   assert.equal(first.metadata.nodeId, p.id);
   assert.equal(typeof first.metadata.nodeId, "string");
   assert.deepEqual(first.values, p.vector);
@@ -290,6 +292,46 @@ test("upsert uses the original node IDs and string nodeId roundtrip", async () =
   assert.equal(hits[0].score, 0.92);
   assert.deepEqual(hits[0].payload, first.metadata);
   assert.deepEqual(hits[0].vector, p.vector);
+});
+
+test("record IDs are deterministic ASCII within Pinecone limits for unicode and oversized node IDs", async () => {
+  const pc = await adapter();
+  const ids = [
+    "repo-1::src/café.ts:10-20",
+    "repo-1::docs/日本語.md::file",
+    "repo-1::src/emoji-🚀-symbols.ts:1-5",
+    `repo-1::${"deeply/nested/".repeat(60)}file.ts:1-2`,
+  ];
+  assert.ok(Math.max(...ids.map((id) => id.length)) > 512, "test needs an over-limit original ID");
+  await pc.upsertChunks(ids.map((id) => point(id)));
+  const writes = calls("/vectors/upsert");
+  const records = writes.flatMap((write) => write.body.vectors as WireRecord[]);
+  assert.equal(records.length, ids.length);
+  const seen = new Set<string>();
+  for (const [index, record] of records.entries()) {
+    // Deterministic: same input always yields the same storage key.
+    assert.equal(record.id, pc.toRecordId(ids[index]));
+    // Valid Pinecone record ID: nonempty ASCII, no null chars, max 512 chars.
+    assert.ok(record.id.length > 0 && record.id.length <= pc.PINECONE_MAX_ID_LENGTH);
+    assert.match(record.id, /^[\x20-\x7e]+$/);
+    assert.ok(!record.id.includes("\0"));
+    assert.ok(!seen.has(record.id), "distinct node IDs must map to distinct record IDs");
+    seen.add(record.id);
+    // Original ID preserved verbatim alongside the derived storage key.
+    assert.equal(record.metadata.nodeId, ids[index]);
+  }
+
+  // Query results recover the exact original ID, however exotic.
+  queryMatches = records.map((record, index) => ({ ...record, score: 0.9 - index * 0.01 }));
+  const hits = await pc.vectorSearch(VECTOR, undefined, 10);
+  assert.deepEqual(hits.map((hit) => hit.id), ids);
+});
+
+test("upsert refuses points without a node ID before any writes", async () => {
+  const pc = await adapter();
+  await assert.rejects(pc.upsertChunks([{ ...point(), id: "" }]), /without a node ID/);
+  assert.equal(pc.toRecordId(""), createHash("sha256").update("", "utf8").digest("hex"));
+  assert.equal(dataCalls().length, 0);
 });
 
 test("flat metadata filters become AND equality predicates and values are opt-in", async () => {

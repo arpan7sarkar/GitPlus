@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   Pinecone,
   type Index,
@@ -8,6 +9,8 @@ import {
 } from "@pinecone-database/pinecone";
 
 export const PINECONE_DIMENSION = 1024;
+/** Pinecone record IDs must be nonempty ASCII without null chars, max 512 chars. */
+export const PINECONE_MAX_ID_LENGTH = 512;
 const BATCH_SIZE = 100;
 // Leave headroom below Pinecone's 2 MB / 1000-record request limits.
 const BATCH_BYTES = 1_900_000;
@@ -192,6 +195,20 @@ function validateVector(vector: number[]): void {
   }
 }
 
+/**
+ * Derive the Pinecone record ID from the complete original node ID.
+ * GitPlus node IDs embed repository paths (`repoId::src/café.ts:1-20`), which
+ * may be non-ASCII or longer than Pinecone's 512-char record-ID limit, so the
+ * full SHA-256 hex digest (64 ASCII chars, deterministic) is stored instead.
+ * The original ID is preserved in `metadata.nodeId`, in Postgres (including
+ * parent relationships), and in retrieval results — only the storage key is
+ * derived. Repeated ingestion of the same node ID yields the same record ID,
+ * so re-ingest remains an upsert.
+ */
+export function toRecordId(nodeId: string): string {
+  return createHash("sha256").update(nodeId, "utf8").digest("hex");
+}
+
 function buildFilter(filter?: Record<string, string>): object | undefined {
   const predicates = Object.entries(filter ?? {}).map(([key, value]) => ({ [key]: { $eq: value } }));
   return predicates.length ? { $and: predicates } : undefined;
@@ -204,13 +221,12 @@ export async function upsertChunks(points: NodePoint[]): Promise<void> {
   const envelopeBytes = Buffer.byteLength(JSON.stringify({ vectors: [], namespace }));
   // Preflight every record before sending any batches (including oversized inputs).
   const records = points.map((point) => {
+    if (!point.id) {
+      throw new Error("[pinecone] Cannot upsert a vector without a node ID.");
+    }
     validateVector(point.vector);
-    // Pinecone record IDs are free-form strings, so the GitPlus node ID is
-    // used as-is — repeated ingestion of the same node ID remains an upsert
-    // with no UUID translation. `nodeId` is still mirrored into metadata for
-    // records written before this change (then stored under a derived UUID).
     const record: PineconeRecord<NodePayload> = {
-      id: point.id,
+      id: toRecordId(point.id),
       values: point.vector,
       metadata: { ...point.payload, nodeId: point.id },
     };

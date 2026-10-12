@@ -23,6 +23,8 @@ the actual differentiator, not a checkbox integration.
 - [Chunking strategy](#chunking-strategy)
 - [Hierarchical RAG](#hierarchical-rag)
 - [Pinecone usage](#pinecone-usage)
+- [Embedding configuration](#embedding-configuration)
+- [Migration limitations](#migration-limitations)
 - [Ingest pipeline](#ingest-pipeline)
 - [Retrieval pipeline](#retrieval-pipeline)
 - [Authentication](#authentication)
@@ -31,6 +33,7 @@ the actual differentiator, not a checkbox integration.
 - [Fallbacks & resilience](#fallbacks--resilience)
 - [Security](#security)
 - [Local setup](#local-setup)
+- [Verification](#verification)
 
 ---
 
@@ -42,8 +45,8 @@ the actual differentiator, not a checkbox integration.
 | Backend | Node.js, Express 5, TypeScript |
 | Relational DB | PostgreSQL (Neon or local Docker), Prisma ORM 7 (driver adapter: `@prisma/adapter-pg`) |
 | Vector DB | **Pinecone** (managed dense index, 1024 dims, cosine; see `server/.env.example`) |
-| Embeddings | OpenAI `text-embedding-3-large` (default, explicitly configurable via `EMBEDDING_*`), truncated to 1024 dims via OpenAI's native `dimensions` param |
-| LLM (chat / summarization / review) | Google Gemini 2.0 Flash (primary) → OpenAI GPT-4o-mini (fallback), automatic failover |
+| Embeddings | OpenAI `text-embedding-3-large` (default) or Gemini `gemini-embedding-001` (explicit opt-in); OpenAI `dimensions` / native Gemini `outputDimensionality`, validated against the configured dimension |
+| LLM (chat / summarization / review) | Google Gemini 2.5 Flash (primary) → OpenAI GPT-4o-mini (fallback), automatic failover |
 | Code parsing | tree-sitter (WASM, via `web-tree-sitter` + `tree-sitter-wasms`) — TS/TSX/JS, Python, Go, Rust, Java |
 | Auth | GitHub OAuth (hand-rolled, not a third-party auth provider), AES-256-GCM token encryption at rest |
 | GitHub API | Octokit (`@octokit/rest`) |
@@ -72,7 +75,7 @@ graph TB
 
     subgraph External["External Services"]
         GH["GitHub REST API"]
-        GEMINI["Gemini 2.0 Flash"]
+        GEMINI["Gemini 2.5 Flash"]
         OPENAI["OpenAI GPT-4o-mini /<br/>text-embedding-3-large"]
     end
 
@@ -181,75 +184,7 @@ expand a small symbol hit up to its complete surrounding file when needed,
 without that file content ever being sent to the embedding model.
 
 ---
-
-## Pinecone usage
-
-One dense index (1024-dim, cosine metric, `gitplus` namespace) holds all four
-tiers. Configure it via `PINECONE_*` in `server/.env` (see
-`server/.env.example`); the server validates the index shape on boot and per
-request but never creates or modifies remote resources. Two retrieval patterns
-are used for real, end to end — not as a token integration:
-
-| Pattern | Where |
-|---|---|
-| **Hybrid Fusion** | `hybridSearch.ts` — Pinecone dense search fused with a Postgres BM25-style keyword search via Reciprocal Rank Fusion (RRF, k=60), followed by MMR diversification |
-| **Filtered Search** | `pinecone.ts` `vectorSearch()` — metadata filters on `repoId`, `level`, `category`, `language` |
-
-**Embedding consistency** is enforced, not assumed: every vector is tagged
-with its embedding origin (`provider`/`model`/`dimensions`, configurable via
-`EMBEDDING_*`, default OpenAI `text-embedding-3-large` @ 1024d), and query
-time rejects a mismatch with a clear re-ingest error instead of returning
-meaningless cross-model neighbours. See `server/src/lib/embeddings.ts`.
-
-**Two real integration points worth knowing** (both verified against the live
-service, not assumed from docs):
-1. **Record IDs are GitPlus's own node IDs, used as-is.** Pinecone accepts
-   arbitrary string IDs, so no UUID translation is needed — re-ingesting the
-   same node ID idempotently updates the same record. The real node ID is also
-   mirrored in `metadata.nodeId` so records written before this change (stored
-   under a derived UUID) still resolve.
-2. **Index validation never provisions.** `ensureIndex()` describes the
-   configured index and rejects wrong dimensions/metrics, unready indexes, or
-   host/name mismatches with an actionable error — create or fix the index in
-   the Pinecone console instead.
-
----
-
-## Ingest pipeline
-
-`POST /api/search/ingest` (`server/src/routes/search.ts`):
-
-```mermaid
-sequenceDiagram
-    participant FE as Frontend
-    participant API as /api/search/ingest
-    participant Chunk as chunker.ts
-    participant LLM as Gemini → OpenAI
-    participant Embed as embeddings.ts
-    participant Pinecone as Pinecone
-    participant PG as Postgres
-
-    FE->>API: repoId, files[], repoMeta
-    API->>API: wipe previous Node/Pinecone data for repoId
-    API->>Chunk: chunkCodeFiles(files)
-    Chunk-->>API: file nodes + symbol chunks
-    API->>LLM: summarize each file (concurrency-limited)
-    LLM-->>API: file summaries
-    API->>LLM: summarize each module (from its files' summaries)
-    API->>LLM: summarize the repo (from its modules' summaries)
-    API->>Embed: embed every tier in one batch pass
-    Embed-->>API: 1024-dim vectors (retried on transient network errors)
-    API->>Pinecone: upsert all vectors (level + embedding origin in metadata)
-    API->>PG: mirror full hierarchy (Node table, parent-before-child)
-    API->>PG: upsert IndexedRepo (if requester is logged in) — non-fatal
-    API-->>FE: { success, count }
-```
-
-Re-indexing the same `repoId` is idempotent: it wipes and rebuilds rather than
-accumulating stale chunks.
-
----
-
+4
 ## Retrieval pipeline
 
 This is what actually runs on every chat message and every hybrid search
@@ -281,8 +216,9 @@ handed to the LLM is diverse, not just individually high-scoring.
 **Real per-turn RAG**: `chat.ts` takes the latest user message, runs this
 exact pipeline against the repo's `repoId`, and injects the result as context
 — every turn, fresh. It falls back to the frontend-supplied static
-`repoContext` only if `repoId` is missing or retrieval returns nothing (e.g.
-the repo hasn't been ingested yet).
+`repoContext` if `repoId` is missing, retrieval returns nothing, or retrieval
+throws an error. This currently includes embedding-mismatch errors; see
+[Migration limitations](#migration-limitations).
 
 ---
 
@@ -373,7 +309,7 @@ All routes are mounted under `/api` in `server/src/index.ts`.
 
 ## Fallbacks & resilience
 
-- **LLM provider failover**: Gemini 2.0 Flash tried first, OpenAI GPT-4o-mini
+- **LLM provider failover**: Gemini 2.5 Flash tried first, OpenAI GPT-4o-mini
   as fallback, with a 60s cooldown on a provider after it 429s — shared by
   chat, summarization, and VexReview (`llm.ts`).
 - **Embeddings retry-with-backoff, no silent model swap**: `embeddings.ts`
@@ -384,9 +320,12 @@ All routes are mounted under `/api` in `server/src/index.ts`.
   used to silently abort an entire ingest *after* all the expensive
   summarization work had already succeeded.
 - **Embedding mismatch guard**: stored vectors carry their origin model and
-  query time rejects a mismatch with a re-ingest error (see
-  [Pinecone usage](#pinecone-usage)) — stale vectors from a previous
-  configuration can't silently poison results.
+  retrieval rejects incompatible vectors before fusion. Hybrid search exposes
+  the re-ingestion error; chat currently catches it and uses fallback context
+  (see [Migration limitations](#migration-limitations)).
+- **Embedding response validation**: both providers must return the expected
+  number of finite, dimension-correct vectors. A malformed response rejects
+  generation before ingestion attempts repository deletion.
 - **Graceful grammar degradation**: if a tree-sitter grammar fails at parse
   time (observed with Ruby's prebuilt WASM binary), that language is disabled
   for the rest of the process and falls back to boundary-snapped chunking
@@ -416,32 +355,66 @@ All routes are mounted under `/api` in `server/src/index.ts`.
 
 ## Local setup
 
-**Prerequisites**: Node.js, Docker (for local Postgres), a GitHub OAuth App,
-a Pinecone account + index, and API keys for Google Gemini and OpenAI.
+**Prerequisites**: Node.js and npm, PostgreSQL (Docker for the local setup below),
+a provisioned Pinecone dense vectors-API index with **1024 dimensions and cosine
+metric**, and the API key for the selected embedding provider. Chat and
+summarization need at least one Gemini/OpenAI key. GitHub sign-in additionally
+requires a GitHub OAuth App and `ENCRYPTION_KEY`.
 
 ```bash
-# 1. Start local Postgres
+# From the repository root: start local Postgres
 cd server
 docker compose up -d
 
-# 2. Configure environment (Pinecone index + embedding/API keys)
-cp .env.example .env   # fill in DATABASE_URL, PINECONE_API_KEY/INDEX_NAME/
-                        # INDEX_HOST (/NAMESPACE), OPENAI_API_KEY,
-                        # GOOGLE_GEMINI_API_KEY, GITHUB_CLIENT_ID/SECRET,
-                        # ENCRYPTION_KEY (32-byte hex), FRONTEND_URL
+# Copy the configuration template and fill in real values
+cp .env.example .env
 
-# 3. Install deps, sync schema, run the server
-npm install
-npx prisma db push
+# Install locked dependencies, generate Prisma Client, and sync the local schema
+npm ci
+npm run prisma:generate
+npm run prisma:push
 npm run dev             # http://localhost:3000
 
-# 4. Frontend, in a second terminal
-cd ../frontend
-npm install
-npm run dev              # http://localhost:8080
+# In a second terminal, from the repository root
+cd frontend
+npm ci
+npm run dev             # http://localhost:8080
 ```
 
-Inspect the Pinecone index/namespace any time with
-`npm run pinecone:inspect` (validates the configured index and reports the
-namespaced vector count). Create or fix the index itself in the Pinecone
-console — the server validates it but never provisions remote resources.
+In `server/.env`, configure `DATABASE_URL`, the three required Pinecone settings,
+`EMBEDDING_PROVIDER`, the chosen provider's model/key, and
+`EMBEDDING_DIMENSIONS=1024`. Keep `FRONTEND_URL=http://localhost:8080` for local
+development. For OAuth, set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and a
+32-byte `ENCRYPTION_KEY` encoded as 64 hexadecimal characters. Do not commit
+`.env` or API keys.
+
+The local Vite proxy forwards `/api` to port 3000. Leave `VITE_API_BASE_URL`
+unset, or set it to `/api`; an existing value pointing at port 8000 will bypass
+the proxy and must be corrected. For deployment, set it to your backend's API
+base URL.
+
+Inspect the configured index and namespace from `server/` with
+`npm run pinecone:inspect`. This performs live Pinecone validation and reports
+the namespace vector count; it does not create an index. Re-ingest existing
+repositories after configuring Pinecone or changing the embedding provider/model.
+
+## Verification
+
+From `server/`:
+
+```bash
+npm test
+npm run build
+```
+
+The tests cover index configuration, filtered search/deletion, namespace counts,
+100-record and byte-bounded upserts, SHA-256 record-ID derivation (unicode and
+over-limit node IDs, original-ID recovery), RRF, provider selection, provenance checks,
+native Gemini request dimensionality, and response validation for both embedding
+providers. HTTP ingestion tests exercise valid ingestion and confirm that
+3072-dimensional Gemini responses or incompatible configured dimensions do not
+attempt deletion or replacement writes.
+
+Provider, Pinecone, and database operations are mocked in these tests. Passing
+checks do not establish live API compatibility, OAuth behavior, or transactional
+recovery from storage failures.

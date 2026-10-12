@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { request } from "node:http";
 import { test } from "node:test";
 import express from "express";
 import pg from "pg";
+
+function toRecordId(nodeId: string): string {
+  return createHash("sha256").update(nodeId, "utf8").digest("hex");
+}
 
 const INDEX_NAME = "gitplus-ingest-test";
 const INDEX_HOST = "gitplus-ingest-test.svc.example.pinecone.io";
@@ -13,6 +18,7 @@ const GEMINI_KEY = "offline-gemini-key";
 type NodeRecord = {
   id: string;
   repoId: string;
+  parentId: string | null;
   embeddingProvider: string;
   embeddingModel: string;
   embeddingDimensions: number;
@@ -206,8 +212,19 @@ for (const scenario of [
       assert.equal(responseBody.count, records.length);
       assert.equal(embeddingInputs.length, records.length);
       assert.equal(storedNodes.length, records.length);
-      assert.deepEqual(records.map((record) => record.id), (storedNodes as NodeRecord[]).map((node) => node.id));
+      const nodeIds = (storedNodes as NodeRecord[]).map((node) => node.id);
+      // Pinecone storage keys are SHA-256 derivations; Postgres keeps the
+      // original IDs and each record carries its original in metadata.nodeId.
+      assert.deepEqual(records.map((record) => record.id), nodeIds.map(toRecordId));
+      assert.deepEqual(records.map((record) => record.metadata.nodeId), nodeIds);
+      // Every parent reference resolves to a mirrored original ID.
+      const nodeIdSet = new Set(nodeIds);
+      for (const node of storedNodes as NodeRecord[]) {
+        assert.equal(node.repoId, REPO_ID);
+        if (node.parentId !== null) assert.ok(nodeIdSet.has(node.parentId), `dangling parentId ${node.parentId}`);
+      }
       for (const record of records) {
+        assert.match(record.id, /^[0-9a-f]{64}$/);
         assert.equal(record.values.length, 1024);
         assert.equal(record.metadata.embeddingProvider, "gemini");
         assert.equal(record.metadata.embeddingModel, "gemini-embedding-001");
