@@ -5,16 +5,26 @@
  * runs fresh on every call — real per-turn RAG, not a static context blob decided
  * once at index time.
  *
- * Pipeline: dense (Actian) + sparse (Postgres keyword) -> RRF fusion over a wide
+ * Pipeline: dense (Pinecone) + sparse (Postgres keyword) -> RRF fusion over a wide
  * candidate pool -> MMR (Max Marginal Relevance) re-ranking down to the final set,
  * so the LLM gets diverse, non-redundant chunks instead of several near-duplicate
  * hits from the same file crowding out everything else -> parent-context expansion
  * (small-to-big) for each surviving chunk.
+ *
+ * Embedding consistency: every stored vector is tagged with its origin model at
+ * ingest time, and the dense hits (plus any tagged Postgres mirror rows) are
+ * verified against the currently configured embedding model before fusion. A
+ * mismatch — e.g. a repo ingested with Gemini embeddings queried with OpenAI —
+ * throws a clear re-ingest error instead of returning meaningless neighbours.
+ * Pre-migration repos with untagged Postgres nodes and no Pinecone vectors
+ * (Actian-era vectors never migrated) are likewise rejected with a re-ingest
+ * error rather than silently degrading to keyword-only results; genuinely
+ * unindexed repos with no stored nodes keep their normal empty results.
  */
 
 import { prisma } from "./prisma.js";
-import { vectorSearch, type SearchHit, type NodeLevel } from "./actian.js";
-import { generateEmbedding } from "./embeddings.js";
+import { vectorSearch, type SearchHit, type NodeLevel } from "./pinecone.js";
+import { assertEmbeddingConsistency, assertLegacyPineconeCoverage, generateEmbedding, getEmbeddingConfig } from "./embeddings.js";
 import { keywordSearch, reciprocalRankFusion } from "./hybridSearch.js";
 
 export interface RetrievedChunk {
@@ -110,10 +120,10 @@ export async function retrieveForQuery(
 
   const queryVector = await generateEmbedding(query);
 
-  const actianFilter: Record<string, string> = { repoId };
-  if (opts?.level) actianFilter.level = opts.level;
-  if (opts?.category) actianFilter.category = opts.category;
-  if (opts?.language) actianFilter.language = opts.language;
+  const pineconeFilter: Record<string, string> = { repoId };
+  if (opts?.level) pineconeFilter.level = opts.level;
+  if (opts?.category) pineconeFilter.category = opts.category;
+  if (opts?.language) pineconeFilter.language = opts.language;
 
   const dbWhere = {
     repoId,
@@ -123,7 +133,7 @@ export async function retrieveForQuery(
   };
 
   const [denseResults, dbNodes] = await Promise.all([
-    vectorSearch(queryVector, actianFilter, FETCH_K, true),
+    vectorSearch(queryVector, pineconeFilter, FETCH_K, true),
     prisma.node.findMany({
       where: dbWhere,
       select: {
@@ -141,9 +151,49 @@ export async function retrieveForQuery(
         summary: true,
         embeddingText: true,
         category: true,
+        embeddingProvider: true,
+        embeddingModel: true,
+        embeddingDimensions: true,
       },
     }),
   ]);
+
+  // Fail fast when the index holds vectors from a different embedding model
+  // than the query was embedded with (or legacy untagged vectors, e.g. repos
+  // ingested with Gemini embeddings while queries now use OpenAI) — fusing
+  // them would silently return meaningless neighbours. The Postgres check only
+  // looks at rows that actually carry origin tags: untagged mirror rows prove
+  // nothing on their own (keyword search needs no vectors), while the Pinecone
+  // check above governs untagged stored vectors.
+  const embeddingConfig = getEmbeddingConfig();
+  assertEmbeddingConsistency(repoId, denseResults, embeddingConfig);
+  assertEmbeddingConsistency(
+    repoId,
+    dbNodes
+      .map((n) => ({
+        payload: {
+          embeddingProvider: n.embeddingProvider,
+          embeddingModel: n.embeddingModel,
+          embeddingDimensions: n.embeddingDimensions,
+        },
+      }))
+      .filter(
+        (h) =>
+          h.payload.embeddingProvider != null ||
+          h.payload.embeddingModel != null ||
+          h.payload.embeddingDimensions != null
+      ),
+    embeddingConfig
+  );
+
+  // Pre-migration repositories hold untagged Postgres nodes while Pinecone
+  // holds no vectors for the repo (Actian-era vectors were never migrated).
+  // Both checks above pass in that state (empty dense input is accepted, and
+  // untagged rows are filtered out of the tagged check), so without this the
+  // request silently degrades to keyword-only results. Throw a re-ingest
+  // error instead — except for genuinely unindexed repos with no stored
+  // nodes, which keep their normal empty results.
+  assertLegacyPineconeCoverage(repoId, denseResults, dbNodes, embeddingConfig);
 
   const dbNodeById = new Map(dbNodes.map((n) => [n.id, n]));
 

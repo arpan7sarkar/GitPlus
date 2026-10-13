@@ -1,23 +1,26 @@
 /**
  * Route: /api/search
- * Feature: Hierarchical Semantic Code Search (Actian VectorAI + Neon Postgres BM25 Keyword Search with RRF)
+ * Feature: Hierarchical Semantic Code Search (Pinecone + Neon Postgres BM25 Keyword Search with RRF)
  *
  * Ingest builds a 4-tier hierarchy per repo — repo -> module -> file -> symbol —
- * and embeds every tier (text-embedding-3-large @ 1024 dims) into one Actian
- * collection with `level` as a filterable payload field. Hybrid search fuses
- * Actian's dense results with Postgres sparse keyword results, then expands each
+ * and embeds every tier (explicit EMBEDDING_PROVIDER/MODEL/DIMENSIONS config,
+ * default OpenAI text-embedding-3-large @ 1024 dims) into one Pinecone
+ * index with `level` as a filterable metadata field. Every vector is tagged
+ * with its embedding origin so query time can reject a model mismatch (stale
+ * vectors from a different model need re-ingestion). Hybrid search fuses
+ * Pinecone's dense results with Postgres sparse keyword results, then expands each
  * hit with its immediate parent's summary for extra context.
  *
  * Endpoints:
- *   - POST /api/search/ingest - Chunks, summarizes, embeds & indexes a repo into Actian & Postgres
+ *   - POST /api/search/ingest - Chunks, summarizes, embeds & indexes a repo into Pinecone & Postgres
  *   - POST /api/search/hybrid - Performs hybrid RRF search combining dense vector search & sparse term matching
  */
 
 import path from "path";
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
-import { upsertChunks, deleteByRepo, type NodeLevel, type NodePayload } from "../lib/actian.js";
-import { generateEmbeddingsBatch } from "../lib/embeddings.js";
+import { ensureIndex, upsertChunks, deleteByRepo, PINECONE_DIMENSION, type NodeLevel, type NodePayload } from "../lib/pinecone.js";
+import { describeEmbedding, generateEmbeddingsBatch, getEmbeddingConfig, isReingestRequiredError } from "../lib/embeddings.js";
 import { chunkCodeFiles, detectCategory, hash, type FileNode, type SymbolChunk } from "../lib/chunker.js";
 import { summarizeFile, summarizeModule, summarizeRepo, mapWithConcurrency } from "../lib/summarize.js";
 import { retrieveForQuery } from "../lib/retrieval.js";
@@ -45,6 +48,12 @@ interface NodeRow {
   embeddingText: string;
   category: string | null;
   contentHash: string;
+  // Origin of the embedding stored for this node — written to both Pinecone
+  // metadata and the Postgres mirror so query time can reject a model mismatch
+  // instead of mixing incompatible vector spaces.
+  embeddingProvider: string;
+  embeddingModel: string;
+  embeddingDimensions: number;
 }
 
 function toPayload(row: NodeRow): NodePayload {
@@ -58,6 +67,9 @@ function toPayload(row: NodeRow): NodePayload {
     startLine: row.startLine || 0,
     endLine: row.endLine || 0,
     lineRange: row.startLine && row.endLine ? `${row.startLine}-${row.endLine}` : "",
+    embeddingProvider: row.embeddingProvider,
+    embeddingModel: row.embeddingModel,
+    embeddingDimensions: row.embeddingDimensions,
   };
 }
 
@@ -83,11 +95,17 @@ router.post("/ingest", async (req: Request, res: Response) => {
 
     console.log(`[search-ingest] Ingesting ${files.length} files for repoId: ${repoId}`);
 
-    // 1. Wipe previous data for this repoId (idempotent re-index)
-    await deleteByRepo(repoId);
-    await prisma.node.deleteMany({ where: { repoId } });
+    const embeddingConfig = getEmbeddingConfig();
+    if (embeddingConfig.dimensions !== PINECONE_DIMENSION) {
+      throw new Error(
+        `[embeddings] EMBEDDING_DIMENSIONS=${embeddingConfig.dimensions} is incompatible with Pinecone. ` +
+          `Set EMBEDDING_DIMENSIONS=${PINECONE_DIMENSION} to match the index.`
+      );
+    }
+    await ensureIndex();
+    console.log(`[search-ingest] Embedding with ${describeEmbedding(embeddingConfig)}`);
 
-    // 2. Symbol-aware chunking (AST where supported, boundary-snapped fallback otherwise)
+    // Symbol-aware chunking (AST where supported, boundary-snapped fallback otherwise)
     const { fileNodes, symbolChunks } = await chunkCodeFiles(files, repoId);
     if (fileNodes.length === 0) {
       return res.json({ success: true, count: 0 });
@@ -157,6 +175,9 @@ router.post("/ingest", async (req: Request, res: Response) => {
       embeddingText: repoSummary,
       category: detectCategory(repoSummary),
       contentHash: hash(repoSummary),
+      embeddingProvider: embeddingConfig.provider,
+      embeddingModel: embeddingConfig.model,
+      embeddingDimensions: embeddingConfig.dimensions,
     });
 
     for (const { modulePath, summary } of moduleSummaries) {
@@ -178,6 +199,9 @@ router.post("/ingest", async (req: Request, res: Response) => {
         embeddingText: summary,
         category: detectCategory(summary),
         contentHash: hash(summary),
+        embeddingProvider: embeddingConfig.provider,
+        embeddingModel: embeddingConfig.model,
+        embeddingDimensions: embeddingConfig.dimensions,
       });
     }
 
@@ -201,6 +225,9 @@ router.post("/ingest", async (req: Request, res: Response) => {
         embeddingText: summary,
         category: detectCategory(summary),
         contentHash: hash(fileNode.content),
+        embeddingProvider: embeddingConfig.provider,
+        embeddingModel: embeddingConfig.model,
+        embeddingDimensions: embeddingConfig.dimensions,
       });
     }
 
@@ -223,13 +250,21 @@ router.post("/ingest", async (req: Request, res: Response) => {
         embeddingText: c.embeddingText,
         category: c.category,
         contentHash: c.contentHash,
+        embeddingProvider: embeddingConfig.provider,
+        embeddingModel: embeddingConfig.model,
+        embeddingDimensions: embeddingConfig.dimensions,
       });
     }
 
-    // 7. Embed every tier in one batch pass (text-embedding-3-large @ 1024 dims)
+    // 7. Embed every tier in one batch pass. Each vector is tagged with the
+    // embedding origin above (toPayload) so query time can reject a model
+    // mismatch instead of mixing incompatible vector spaces.
     const embeddings = await generateEmbeddingsBatch(nodes.map((n) => n.embeddingText));
 
-    // 8. Upsert into Actian VectorAI (single collection, `level` filterable in payload)
+    // Keep the old index intact until summaries and embeddings have succeeded.
+    await deleteByRepo(repoId);
+    await prisma.node.deleteMany({ where: { repoId } });
+
     await upsertChunks(
       nodes.map((n, i) => ({
         id: n.id,
@@ -243,13 +278,14 @@ router.post("/ingest", async (req: Request, res: Response) => {
 
     console.log(
       `[search-ingest] Indexed ${nodes.length} nodes for repoId: ${repoId} ` +
-        `(1 repo, ${moduleSummaries.length} modules, ${fileNodes.length} files, ${symbolChunks.length} symbols)`
+        `(1 repo, ${moduleSummaries.length} modules, ${fileNodes.length} files, ${symbolChunks.length} symbols) ` +
+        `with ${describeEmbedding(embeddingConfig)}`
     );
 
     // 10. If the requester is logged in, record this repo against their account
     // (powers the "My Repos" page — the Node hierarchy above has no userId,
     // it's keyed only by repoId, so this is the only user<->repo association).
-    // Non-fatal: the expensive work above (embeddings, Actian, Postgres nodes)
+    // Non-fatal: the expensive work above (embeddings, Pinecone, Postgres nodes)
     // already succeeded by this point, so a failure here shouldn't turn the
     // whole ingest into an error — it would just mean re-indexing is needed to
     // pick the repo up in the list.
@@ -283,7 +319,15 @@ router.post("/ingest", async (req: Request, res: Response) => {
       }
     }
 
-    return res.json({ success: true, count: nodes.length });
+    return res.json({
+      success: true,
+      count: nodes.length,
+      embedding: {
+        provider: embeddingConfig.provider,
+        model: embeddingConfig.model,
+        dimensions: embeddingConfig.dimensions,
+      },
+    });
   } catch (err: any) {
     console.error("[search-ingest error]:", err);
     return res.status(500).json({ error: err.message || "Failed to ingest codebase chunks" });
@@ -303,7 +347,7 @@ router.post("/hybrid", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "query and repoId string parameters are required" });
     }
 
-    // Dense (Actian) + sparse (Postgres) fusion, MMR-diversified, parent-expanded —
+    // Dense (Pinecone) + sparse (Postgres) fusion, MMR-diversified, parent-expanded —
     // same retrieval pipeline /api/chat uses internally for RAG.
     const { chunks } = await retrieveForQuery(query, repoId, {
       level: filter?.level,
@@ -328,6 +372,10 @@ router.post("/hybrid", async (req: Request, res: Response) => {
       })),
     });
   } catch (err: any) {
+    if (isReingestRequiredError(err)) {
+      console.warn("[search-hybrid] Re-indexing required:", err.message);
+      return res.status(409).json({ error: err.userMessage });
+    }
     console.error("[search-hybrid error]:", err);
     return res.status(500).json({ error: err.message || "Hybrid search failed" });
   }

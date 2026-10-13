@@ -138,11 +138,13 @@ export interface IngestResponse {
 }
 
 export interface HealthResponse {
-  status: "ok" | "degraded" | "error";
+  status: "ok" | "degraded";
   service: string;
   postgres: "connected" | "disconnected";
-  vectorai: "connected" | "disconnected";
+  pinecone: "connected" | "disconnected";
+  /** -1 when the vector point count is unavailable. */
   vectorPointCount: number;
+  vectorError?: string;
   timestamp: string;
 }
 

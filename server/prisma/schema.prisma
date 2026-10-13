@@ -154,8 +154,8 @@ model Visit {
 
 // ─── Nodes (Hierarchical Vector Search Metadata Mirror) ─────────────────────────
 // One unified table for all 4 tiers of the retrieval hierarchy: repo -> module ->
-// file -> symbol. Mirrors what's embedded and stored in Actian VectorAI, plus the
-// "huge context" fields (full file content, LLM summaries) Actian doesn't need to
+// file -> symbol. Mirrors what's embedded and stored in Pinecone, plus the
+// "huge context" fields (full file content, LLM summaries) Pinecone doesn't need to
 // hold — this table is what keyword search runs against and what retrieval walks
 // up `parentId` to expand a small symbol hit into its surrounding file/module/repo
 // context before handing it to the LLM.
@@ -186,6 +186,14 @@ model Node {
   content          String?   // full raw file text, file level only ("huge context")
   summary          String?   // LLM-generated summary, file/module/repo level
   embeddingText    String    @default("") @map("embedding_text") // what was actually embedded + what keyword search runs against
+
+  // Origin of the vector stored in Pinecone for this node. Written at ingest
+  // time; query time rejects a mismatch with the configured embedding model
+  // instead of mixing incompatible vector spaces. Null = ingested before
+  // model tracking (re-ingest to tag these rows).
+  embeddingProvider   String? @map("embedding_provider")
+  embeddingModel      String? @map("embedding_model")
+  embeddingDimensions Int?    @map("embedding_dimensions")
 
   category         String?
   contentHash      String    @default("") @map("content_hash")

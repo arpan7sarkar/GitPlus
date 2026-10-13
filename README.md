@@ -8,10 +8,11 @@ context pulled fresh on every message. It also generates onboarding docs,
 security audits, system design docs, and (via VexReview) AI pull-request
 reviews, all grounded in the same retrieval pipeline.
 
-Built for the **Accio Relevance — Build with Actian VectorAI Database** track.
-The retrieval architecture below — AST-aware chunking, a 4-tier hierarchy, and
-dense+sparse fusion with MMR diversification — is the actual differentiator,
-not a checkbox integration.
+Originally built for the **Accio Relevance — Build with Actian VectorAI
+Database** track; the vector store has since been migrated to **Pinecone**
+(managed), keeping the same retrieval architecture — AST-aware chunking, a
+4-tier hierarchy, and dense+sparse fusion with MMR diversification — which is
+the actual differentiator, not a checkbox integration.
 
 ---
 
@@ -21,7 +22,9 @@ not a checkbox integration.
 - [System architecture](#system-architecture)
 - [Chunking strategy](#chunking-strategy)
 - [Hierarchical RAG](#hierarchical-rag)
-- [Actian VectorAI usage](#actian-vectorai-usage)
+- [Pinecone usage](#pinecone-usage)
+- [Embedding configuration](#embedding-configuration)
+- [Migration limitations](#migration-limitations)
 - [Ingest pipeline](#ingest-pipeline)
 - [Retrieval pipeline](#retrieval-pipeline)
 - [Authentication](#authentication)
@@ -30,6 +33,7 @@ not a checkbox integration.
 - [Fallbacks & resilience](#fallbacks--resilience)
 - [Security](#security)
 - [Local setup](#local-setup)
+- [Verification](#verification)
 
 ---
 
@@ -40,8 +44,8 @@ not a checkbox integration.
 | Frontend | React 19, Vite, TypeScript, Tailwind CSS, shadcn/ui (Radix primitives), zustand, framer-motion |
 | Backend | Node.js, Express 5, TypeScript |
 | Relational DB | PostgreSQL (Neon or local Docker), Prisma ORM 7 (driver adapter: `@prisma/adapter-pg`) |
-| Vector DB | **Actian VectorAI** (self-hosted via Docker ) |
-| Embeddings | OpenAI `text-embedding-3-large`, truncated to 1024 dims via OpenAI's native `dimensions` param |
+| Vector DB | **Pinecone** (managed dense index, 1024 dims, cosine; see `server/.env.example`) |
+| Embeddings | OpenAI `text-embedding-3-large` (default) or Gemini `gemini-embedding-001` (explicit opt-in); OpenAI `dimensions` / native Gemini `outputDimensionality`, validated against the configured dimension |
 | LLM (chat / summarization / review) | Google Gemini 2.0 Flash (primary) → OpenAI GPT-4o-mini (fallback), automatic failover |
 | Code parsing | tree-sitter (WASM, via `web-tree-sitter` + `tree-sitter-wasms`) — TS/TSX/JS, Python, Go, Rust, Java |
 | Auth | GitHub OAuth (hand-rolled, not a third-party auth provider), AES-256-GCM token encryption at rest |
@@ -66,7 +70,7 @@ graph TB
 
     subgraph Data["Data Layer"]
         PG[("PostgreSQL<br/>Node hierarchy, Users,<br/>Sessions, IndexedRepos")]
-        ACTIAN[("Actian VectorAI<br/>1024-dim vectors<br/>level/category/language filters")]
+        PINECONE[("Pinecone<br/>1024-dim vectors<br/>level/category/language filters")]
     end
 
     subgraph External["External Services"]
@@ -80,9 +84,9 @@ graph TB
     API --> RET
     API --> VEX
     CHUNK --> PG
-    CHUNK --> ACTIAN
+    CHUNK --> PINECONE
     RET --> PG
-    RET --> ACTIAN
+    RET --> PINECONE
     RET --> GEMINI
     RET --> OPENAI
     VEX --> GH
@@ -91,7 +95,7 @@ graph TB
     API --> GH
     API -.OAuth.-> GH
 
-    style ACTIAN fill:#0f766e,color:#fff
+    style PINECONE fill:#0f766e,color:#fff
     style PG fill:#1e3a5f,color:#fff
 ```
 
@@ -170,9 +174,9 @@ graph TD
 
 A vague question ("what does this app do?") matches best against repo/module
 summaries. A specific one ("where do we handle rate limiting?") matches best
-against symbol-level code. Both live in the same Actian collection, and
-`level` is a filterable payload field — so this hierarchy is also GitPlus's
-concrete use of Actian's **Filtered Search** pattern, not a separate feature.
+against symbol-level code. Both live in the same Pinecone index, and
+`level` is a filterable metadata field — so this hierarchy is also GitPlus's
+concrete use of Pinecone's **filtered search**, not a separate feature.
 
 Each file-level node also stores the **full raw file content** in Postgres
 (not just its embedding) — this is the "huge context" layer: retrieval can
@@ -181,73 +185,99 @@ without that file content ever being sent to the embedding model.
 
 ---
 
-## Actian VectorAI usage
+## Pinecone usage
 
-One collection (`gitplus_nodes_v3`, 1024-dim, cosine distance) holds all four
-tiers. Two of the track's three advanced patterns are used for real, end to
-end — not as a token integration:
+GitPlus uses an **existing managed dense vectors-API index**, not Pinecone's
+integrated embedding or documents API. Configure `PINECONE_API_KEY`,
+`PINECONE_INDEX_NAME`, and `PINECONE_INDEX_HOST` in `server/.env`. The adapter
+validates readiness, the matching index name/host, and a vectors-API schema with
+`_values` containing **1024-dimensional dense vectors and cosine similarity**.
+GitPlus does not provision indexes, alter their schema, or switch embedding
+models to fit an incompatible index.
 
-| Pattern | Where |
+- `PINECONE_NAMESPACE` defaults to `gitplus`; queries, upserts, repository
+  deletion, and counts use that namespace. Deletion additionally filters by
+  `repoId`, rather than deleting an entire namespace.
+- Dense retrieval filters by `repoId` and optional `level`, `category`, and
+  `language`. It requests metadata and vectors, retaining the latter for local
+  MMR re-ranking. PostgreSQL supplies keyword candidates and parent summaries;
+  rank fusion happens locally, not through Pinecone sparse search.
+- Each Pinecone storage ID is the 64-character ASCII SHA-256 hex digest of the
+  complete original node ID. The original ID remains in `metadata.nodeId` and
+  PostgreSQL, including parent references. Query results recover that original
+  identity, allowing Unicode paths and long node IDs without breaking joins.
+- Upserts are limited to 100 records per batch and a 1,900,000-byte serialized
+  request budget. Namespace counts return `0` for a missing namespace and `-1`
+  when statistics are unavailable or the index is incompatible.
+
+## Embedding configuration
+
+Ingestion and retrieval read the same explicit provider/model/dimension
+configuration. Merely adding or removing an API key never selects a different
+embedding provider, and embedding failures never trigger cross-provider fallback.
+
+| Setting | Default / behavior |
 |---|---|
-| **Hybrid Fusion** | `hybridSearch.ts` — Actian dense search fused with a Postgres BM25-style keyword search via Reciprocal Rank Fusion (RRF), using the SDK's own `reciprocalRankFusion` where available, with a manual RRF fallback |
-| **Filtered Search** | `actian.ts` `vectorSearch()` — payload filters on `repoId`, `level`, `category`, `language`, applied via the SDK's real `Field`/`Filter` classes |
+| `EMBEDDING_PROVIDER` | `openai`; explicitly set `gemini` to opt in |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-large`; takes precedence over `EMBEDDING_MODEL` |
+| `GOOGLE_GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001`; takes precedence over its alias `GEMINI_EMBEDDING_MODEL`, then `EMBEDDING_MODEL` |
+| `EMBEDDING_MODEL` | Generic override when the selected provider's more specific setting is absent |
+| `EMBEDDING_DIMENSIONS` | `1024`; must remain `1024` for this Pinecone adapter |
+| `OPENAI_API_KEY` / `GOOGLE_GEMINI_API_KEY` | The selected embedding provider's key is required |
 
-**Named Vectors** (a second embedding space per point) was scoped in an early
-design doc but not shipped — the hierarchical `level`-filtered single-space
-design ended up covering the same "different granularities need different
-retrieval" problem more directly, so it was deprioritized in favor of finishing
-the retrieval pipeline itself (MMR, per-turn RAG chat) rather than building a
-second pattern for its own sake.
+OpenAI embeddings request `dimensions`; Gemini uses the native
+`batchEmbedContents` API with `outputDimensionality`. Both response paths validate
+the number of embeddings, dimensionality, and finite numeric values. Ingestion
+stores `embeddingProvider`, `embeddingModel`, and `embeddingDimensions` on every
+Pinecone record and PostgreSQL node. Retrieval checks those tags before fusion:
+equal dimensions alone do **not** make different models' vectors compatible.
 
-**Two real integration bugs found and fixed** against the actual Actian
-server (not assumptions from docs):
-1. **Point IDs must be valid UUIDs.** GitPlus's own node IDs
-   (`repoId::path:startLine-endLine`) aren't UUID-shaped. Fixed with a
-   deterministic SHA-256-derived UUID as the Actian-side point ID, with the
-   real node ID carried in `payload.nodeId` — so upserts are idempotent
-   (re-ingest updates the same point) and every caller downstream of
-   `vectorSearch()` only ever sees GitPlus's own IDs.
-2. **The filter parameter needs a real `Field`/`Filter` class instance**, not
-   a plain `{ must: [...] }` object — the SDK's `points.search()` calls
-   `.isEmpty()` on whatever it's given. A plain object throws
-   `filter.isEmpty is not a function` at runtime. Both `vectorSearch()` and
-   `deleteByRepo()` build filters via `new Field(...).eq(...)`, chained with
-   `.and(...)` for multiple conditions.
+Changing the embedding provider or model requires re-indexing affected
+repositories with the current configuration. These embedding settings do not
+change the upstream chat/summarization model: those callers retain the fixed
+`gemini-2.0-flash` model with OpenAI `gpt-4o-mini` fallback.
 
----
+## Migration limitations
+
+- Actian vectors are **not automatically copied into Pinecone**. Re-index existing
+  repositories after configuring a compatible Pinecone index. Retrieval rejects
+  untagged dense hits and pre-migration repositories with untagged PostgreSQL
+  nodes but no Pinecone hits, rather than silently returning legacy keyword-only
+  results. A genuinely unindexed repository with no stored nodes still returns
+  an empty result.
+- An embedding mismatch or detected legacy index returns **HTTP 409 JSON** from
+  hybrid search and chat, instructing the user to re-index the repository. Chat
+  returns this error before SSE headers or any chat-completion request; it does
+  not generate an answer from static fallback context in this state.
+- Replacement spans **two independent stores and is not transactional**.
+  Summarization and validated embedding generation happen before deletion, so
+  failures in those stages preserve the old repository. Once deletion begins,
+  a Pinecone or PostgreSQL failure can leave missing or partially replaced data;
+  there is no automatic cross-store rollback. Re-indexing is the recovery path,
+  not a guarantee of atomic replacement.
+- Offline tests verify the adapter and call-site safeguards against controlled
+  provider/storage responses. They do not establish live Pinecone/Gemini/OpenAI
+  compatibility or recovery from real storage failures.
 
 ## Ingest pipeline
 
-`POST /api/search/ingest` (`server/src/routes/search.ts`):
+`POST /api/search/ingest` (`server/src/routes/search.ts`) performs these stages:
 
-```mermaid
-sequenceDiagram
-    participant FE as Frontend
-    participant API as /api/search/ingest
-    participant Chunk as chunker.ts
-    participant LLM as Gemini → OpenAI
-    participant Embed as embeddings.ts
-    participant Actian as Actian VectorAI
-    participant PG as Postgres
+1. Validate the requested embedding dimensions against the adapter's fixed 1024
+   dimensions, then validate the configured Pinecone index.
+2. Parse files into file and symbol nodes using AST-aware chunking, with the
+   existing boundary-snapped fallback for unsupported grammars.
+3. Generate file, module, and repository summaries, then assemble the four-tier
+   hierarchy with original IDs, parent references, and embedding provenance.
+4. Embed every hierarchy tier and validate the complete embedding response
+   before attempting repository deletion.
+5. Delete this repository's Pinecone records and PostgreSQL nodes, upsert the new
+   vectors with SHA-256 storage IDs, and mirror the hierarchy into PostgreSQL.
+6. Return the indexed node count and embedding configuration. For a logged-in
+   requester, recording the repository in "My Repos" is a non-fatal side effect.
 
-    FE->>API: repoId, files[], repoMeta
-    API->>API: wipe previous Node/Actian data for repoId
-    API->>Chunk: chunkCodeFiles(files)
-    Chunk-->>API: file nodes + symbol chunks
-    API->>LLM: summarize each file (concurrency-limited)
-    LLM-->>API: file summaries
-    API->>LLM: summarize each module (from its files' summaries)
-    API->>LLM: summarize the repo (from its modules' summaries)
-    API->>Embed: embed every tier in one batch pass
-    Embed-->>API: 1024-dim vectors (retried on transient network errors)
-    API->>Actian: upsert all vectors (level in payload)
-    API->>PG: mirror full hierarchy (Node table, parent-before-child)
-    API->>PG: upsert IndexedRepo (if requester is logged in) — non-fatal
-    API-->>FE: { success, count }
-```
-
-Re-indexing the same `repoId` is idempotent: it wipes and rebuilds rather than
-accumulating stale chunks.
+The replacement order in step 5 is not atomic; see
+[Migration limitations](#migration-limitations).
 
 ---
 
@@ -260,7 +290,7 @@ context blob decided once at index time:
 ```mermaid
 flowchart LR
     Q["Query<br/>(latest chat message,<br/>or search box)"] --> EMB["Embed query"]
-    EMB --> DENSE["Actian dense search<br/>(top 25, with vectors,<br/>level/category/language filters)"]
+    EMB --> DENSE["Pinecone dense search<br/>(top 25, with vectors,<br/>level/category/language filters)"]
     EMB --> SPARSE["Postgres keyword search<br/>(BM25-style term matching)"]
     DENSE --> RRF["Reciprocal Rank Fusion<br/>(k=60, pool of 25)"]
     SPARSE --> RRF
@@ -282,8 +312,11 @@ handed to the LLM is diverse, not just individually high-scoring.
 **Real per-turn RAG**: `chat.ts` takes the latest user message, runs this
 exact pipeline against the repo's `repoId`, and injects the result as context
 — every turn, fresh. It falls back to the frontend-supplied static
-`repoContext` only if `repoId` is missing or retrieval returns nothing (e.g.
-the repo hasn't been ingested yet).
+`repoContext` if `repoId` is missing, retrieval returns nothing, or an ordinary
+retrieval failure occurs. Embedding mismatches and detected legacy indexes do
+**not** fall back: chat returns HTTP 409 JSON instructing the user to re-index,
+before setting SSE headers or requesting an AI answer. See
+[Migration limitations](#migration-limitations).
 
 ---
 
@@ -364,7 +397,7 @@ All routes are mounted under `/api` in `server/src/index.ts`.
 | `/api/repo/index` | POST | Fetch a repo's file tree + contents from GitHub (full or on-demand mode) |
 | `/api/repo/file`, `/fetch-batch` | POST | On-demand single/batch file fetch |
 | `/api/repo/issues`, `/pulls`, `/commits`, `/pulls/:pr/diff` | GET/POST | GitHub issues/PRs/commits passthrough |
-| `/api/search/ingest` | POST | Chunk → summarize → embed → index a repo (Actian + Postgres) |
+| `/api/search/ingest` | POST | Chunk → summarize → embed → index a repo (Pinecone + Postgres) |
 | `/api/search/hybrid` | POST | Dense+sparse fused, MMR-diversified search over an indexed repo |
 | `/api/chat` | POST | SSE-streamed chat (`chat` action) or JSON (`overview`/`security`/`onboarding`/`system-design` actions), with per-turn RAG when `repoId` is present |
 | `/api/sessions` | POST/GET/PUT | Shareable chat session persistence (no login required) |
@@ -377,11 +410,21 @@ All routes are mounted under `/api` in `server/src/index.ts`.
 - **LLM provider failover**: Gemini 2.0 Flash tried first, OpenAI GPT-4o-mini
   as fallback, with a 60s cooldown on a provider after it 429s — shared by
   chat, summarization, and VexReview (`llm.ts`).
-- **Embeddings retry-with-backoff**: `embeddings.ts` retries transient network
-  failures (`ECONNRESET`, `ETIMEDOUT`, 429, 5xx) up to 3 times with exponential
-  backoff. This was added after a real production incident: an uncaught
-  network error here used to silently abort an entire ingest *after* all the
-  expensive summarization work had already succeeded.
+- **Embeddings retry-with-backoff, no silent model swap**: `embeddings.ts`
+  retries transient network failures (`ECONNRESET`, `ETIMEDOUT`, 429, 5xx) up
+  to 3 times with exponential backoff — never by falling back to a different
+  embedding provider (vectors from different models are incompatible). This
+  was added after a real production incident: an uncaught network error here
+  used to silently abort an entire ingest *after* all the expensive
+  summarization work had already succeeded.
+- **Embedding mismatch guard**: stored vectors carry their origin model and
+  retrieval rejects incompatible vectors before fusion. Hybrid search and chat
+  expose HTTP 409 re-indexing errors; chat returns before SSE or AI generation
+  rather than using fallback context (see
+  [Migration limitations](#migration-limitations)).
+- **Embedding response validation**: both providers must return the expected
+  number of finite, dimension-correct vectors. A malformed response rejects
+  generation before ingestion attempts repository deletion.
 - **Graceful grammar degradation**: if a tree-sitter grammar fails at parse
   time (observed with Ruby's prebuilt WASM binary), that language is disabled
   for the rest of the process and falls back to boundary-snapped chunking
@@ -390,9 +433,9 @@ All routes are mounted under `/api` in `server/src/index.ts`.
   Repos") is wrapped so a failure there can't roll back an otherwise-successful
   ingest — worst case is "re-index to pick it up in the list," not losing the
   whole ingest.
-- **RRF fallback**: hybrid search tries the Actian SDK's own
-  `reciprocalRankFusion` first, falling back to a manual RRF calculation if
-  the SDK call throws or returns nothing usable.
+- **RRF is a local implementation**: hybrid search fuses Pinecone dense
+  results with Postgres keyword results via the `reciprocalRankFusion`
+  helper in `hybridSearch.ts` — no vector-SDK dependency in the fusion path.
 
 ---
 
@@ -404,37 +447,78 @@ All routes are mounted under `/api` in `server/src/index.ts`.
 - CORS locked to a configured `FRONTEND_URL` with `credentials: true` (not
   `origin: "*"`, which is incompatible with credentialed cookies anyway).
 - Rate limiting on all `/api/*` routes (`express-rate-limit`).
-- Actian's own delete/filter operations go through the real SDK client
-  consistently — no raw REST bypass.
+- Pinecone deletes are namespace-scoped and filter-targeted (no `deleteAll`,
+  no id-lists); SDK errors are sanitized so responses never leak credentials.
 
 ---
 
 ## Local setup
 
-**Prerequisites**: Node.js, Docker, a GitHub OAuth App, and API keys for
-Google Gemini and OpenAI.
+**Prerequisites**: Node.js and npm, PostgreSQL (Docker for the local setup below),
+a provisioned Pinecone dense vectors-API index with **1024 dimensions and cosine
+metric**, and the API key for the selected embedding provider. Chat and
+summarization need at least one Gemini/OpenAI key. GitHub sign-in additionally
+requires a GitHub OAuth App and `ENCRYPTION_KEY`.
 
 ```bash
-# 1. Start Postgres + Actian VectorAI
+# From the repository root: start local Postgres
 cd server
 docker compose up -d
 
-# 2. Configure environment
-cp .env.example .env   # fill in DATABASE_URL, GOOGLE_GEMINI_API_KEY,
-                        # OPENAI_API_KEY, GITHUB_CLIENT_ID/SECRET,
-                        # ENCRYPTION_KEY (32-byte hex), FRONTEND_URL
+# Copy the configuration template and fill in real values
+cp .env.example .env
 
-# 3. Install deps, sync schema, run the server
-npm install
-npx prisma db push
+# Install locked dependencies, generate Prisma Client, and sync the local schema
+npm ci
+npm run prisma:generate
+npm run prisma:push
 npm run dev             # http://localhost:3000
 
-# 4. Frontend, in a second terminal
-cd ../frontend
-npm install
-npm run dev              # http://localhost:8080
+# In a second terminal, from the repository root
+cd frontend
+npm ci
+npm run dev             # http://localhost:8080
 ```
 
-The Actian dashboard (Console / Collections browser / License Manager) is
-reachable at `http://localhost:6575` once the container is up — useful for
-inspecting the `gitplus_nodes_v3` collection directly.
+In `server/.env`, configure `DATABASE_URL`, the three required Pinecone settings,
+`EMBEDDING_PROVIDER`, the chosen provider's model/key, and
+`EMBEDDING_DIMENSIONS=1024`. Keep `FRONTEND_URL=http://localhost:8080` for local
+development. For OAuth, set `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and a
+32-byte `ENCRYPTION_KEY` encoded as 64 hexadecimal characters. Do not commit
+`.env` or API keys.
+
+The local Vite proxy forwards `/api` to port 3000. Leave `VITE_API_BASE_URL`
+unset, or set it to `/api`; an existing value pointing at port 8000 will bypass
+the proxy and must be corrected. For deployment, set it to your backend's API
+base URL.
+
+Inspect the configured index and namespace from `server/` with
+`npm run pinecone:inspect`. This performs live Pinecone validation and reports
+the namespace vector count; it does not create an index. Re-ingest existing
+repositories after configuring Pinecone or changing the embedding provider/model.
+
+## Verification
+
+From `server/`:
+
+```bash
+npm test
+npm run build
+```
+
+The tests cover index configuration, filtered search/deletion, namespace counts,
+100-record and byte-bounded upserts, SHA-256 record-ID derivation (unicode and
+over-limit node IDs, original-ID recovery), RRF, provider selection, provenance checks,
+native Gemini request dimensionality, and response validation for both embedding
+providers. HTTP ingestion tests exercise valid ingestion and confirm that
+3072-dimensional Gemini responses or incompatible configured dimensions do not
+attempt deletion or replacement writes. Direct retrieval tests exercise the real
+pipeline, including same-provider model changes in dense metadata and PostgreSQL
+tags, legacy repositories with empty Pinecone results, compatible retrieval with
+original node IDs and parent context, and genuinely empty repositories. HTTP
+chat and hybrid-search tests verify re-indexing errors at the route boundary;
+chat coverage also checks successful SSE and ordinary static-context fallback.
+
+Provider, Pinecone, and database operations are mocked in these tests. Passing
+checks do not establish live API compatibility, OAuth behavior, or transactional
+recovery from storage failures.

@@ -13,7 +13,7 @@ import visitsRouter from "./routes/visits.js";
 import searchRouter from "./routes/search.js";
 import vexreviewRouter from "./routes/vexreview.js";
 
-import { ensureCollection, countPoints } from "./lib/actian.js";
+import { ensureIndex, countPoints } from "./lib/pinecone.js";
 import { prisma } from "./lib/prisma.js";
 
 const app = express();
@@ -48,7 +48,7 @@ app.use("/api/visits", visitsRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/vexreview", vexreviewRouter);
 
-// Health Check Endpoint (Postgres + Actian status)
+// Health Check Endpoint (Postgres + Pinecone status)
 app.get("/health", async (_req, res) => {
   try {
     let postgresStatus = "disconnected";
@@ -59,17 +59,26 @@ app.get("/health", async (_req, res) => {
       console.warn("[health] Postgres ping failed:", dbErr);
     }
 
-    const vectorCount = await countPoints();
-    const vectorStatus = vectorCount >= 0 ? "connected" : "disconnected";
+    let vectorCount = -1;
+    let vectorError: string | undefined;
+    try {
+      await ensureIndex();
+      vectorCount = await countPoints();
+      if (vectorCount < 0) vectorError = "Pinecone index statistics are unavailable";
+    } catch (err) {
+      vectorError = err instanceof Error ? err.message : "Pinecone index is unavailable";
+    }
+    const pineconeStatus = vectorCount >= 0 ? "connected" : "disconnected";
 
-    const isHealthy = postgresStatus === "connected" && vectorStatus === "connected";
+    const isHealthy = postgresStatus === "connected" && pineconeStatus === "connected";
 
     return res.status(isHealthy ? 200 : 503).json({
       status: isHealthy ? "ok" : "degraded",
       service: "gitplus-server",
       postgres: postgresStatus,
-      vectorai: vectorStatus,
+      pinecone: pineconeStatus,
       vectorPointCount: vectorCount,
+      ...(vectorError ? { vectorError } : {}),
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -83,6 +92,10 @@ app.get("/health", async (_req, res) => {
 // Server Initialization
 app.listen(PORT, async () => {
   console.log(`[gitplus-server] Server running on http://localhost:${PORT}`);
-  await ensureCollection();
-  console.log("[gitplus-server] Actian VectorAI collection verified");
+  try {
+    await ensureIndex();
+    console.log("[gitplus-server] Pinecone index verified");
+  } catch (err) {
+    console.warn("[gitplus-server] Pinecone unavailable:", err instanceof Error ? err.message : "Index validation failed");
+  }
 });

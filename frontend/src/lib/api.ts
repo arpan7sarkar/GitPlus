@@ -416,7 +416,7 @@ export async function fetchFileBatch(params: {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * POST /api/search/ingest — Ingests code chunks into Actian VectorAI + Prisma.
+ * POST /api/search/ingest — Ingests code chunks into Pinecone + Prisma.
  */
 export async function ingestCodeChunks(
   repoId: string,
@@ -512,12 +512,14 @@ export async function fetchVisitStats(): Promise<VisitStats> {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * GET /health — Server health check (Postgres + Actian VectorAI status).
+ * GET /health — Server health check (Postgres + Pinecone status).
  * Note: This endpoint is NOT under /api, it's at the root level.
  */
 export async function checkHealth(): Promise<HealthResponse> {
-  const res = await fetch("/health");
-  if (!res.ok) {
+  const healthUrl = `${BASE.replace(/\/api$/, "")}/health`;
+  const res = await fetch(healthUrl, { credentials: "include" });
+  // A degraded server returns the same health contract with HTTP 503.
+  if (!res.ok && res.status !== 503) {
     throw new Error(`Health check failed: HTTP ${res.status}`);
   }
   return res.json();
